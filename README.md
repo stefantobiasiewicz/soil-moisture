@@ -1,4 +1,4 @@
-#Soil moisture ble sensor
+# Soil moisture ble sensor
 
 **GATT Service UUID:** 0000AAAA-0000-1000-8000-00805F9B34FB
 
