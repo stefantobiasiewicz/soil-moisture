@@ -9,7 +9,7 @@
 
 int validateCalibration(int value) {
     if (value == CAL_START || value == CAL_LOW || value == CAL_HIGH || value == CAL_END) {
-        return VALIDATION_OK;
+        return ERROR_OK;
     } else {
         return ERROR_INVALID_CALIBRATION;
     }
@@ -17,7 +17,7 @@ int validateCalibration(int value) {
 
 int validateTimeInterval(int value) {
     if (value >= 0 && value <= 65535) {
-        return VALIDATION_OK;
+        return ERROR_OK;
     } else {
         return ERROR_OUT_OF_RANGE_INTERVAL;
     }
@@ -25,7 +25,7 @@ int validateTimeInterval(int value) {
 
 int validateSoilMoisture(int value) {
     if (value >= 0 && value <= 1000) {
-        return VALIDATION_OK;
+        return ERROR_OK;
     } else {
         return ERROR_OUT_OF_RANGE_SOIL_MOISTURE;
     }
@@ -33,16 +33,16 @@ int validateSoilMoisture(int value) {
 
 int validateBatteryLevel(int value) {
     if (value >= 0 && value <= 1000) {
-        return VALIDATION_OK;
+        return ERROR_OK;
     } else {
         return ERROR_OUT_OF_RANGE_BATTERY_LEVEL;
     }
 }
 
-int isPointerNull(void* pointer) {
+int is_pointer_null(void* pointer) {
     if (pointer == NULL) {
-        return VALIDATION_OK;
-    } else {
         return ERROR_NULL_POINTER;
+    } else {
+        return ERROR_OK;
     }
 }

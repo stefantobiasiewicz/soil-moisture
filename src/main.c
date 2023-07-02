@@ -10,35 +10,61 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/adc.h>
 
+#include <zephyr/sys/reboot.h>
+
+#include <zephyr/logging/log.h>
+
 #include "hardware.h"
 #include "app.h"
+#include "error.h"
+#include "flash.h"
 
-static struct hardware_api hardware_api_imp = {
+
+
+LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
+
+static struct hardware_api_t hardware = {
     .read_adc_mv_battery = hardware_read_adc_mv_battery,
 	.read_adc_mv_moisture = hardware_read_adc_mv_moisture
 };
 
-static struct notify_api notify_api_imp = 
+void notify_paceholder(uint16_t a) {
+	
+}
+
+static struct notify_api_t notify = 
 {
-    .send_notification = NULL
+    .send_notification = notify_paceholder
+};
+
+static struct flash_api_t flash = 
+{
+	.read_calibration_data = flash_read_data,
+	.write_calibration_data = flash_write_data
 };
 
 void error() {
-	while (1) {
-		;
-		// todo implement init error
-	}
+	LOG_ERR("Application occur error rebooting.");
+	k_sleep(K_MSEC(3000));
+	sys_reboot(0);
 }
 
 void main(void)
 {	
-	if (hardware_init() != VALIDATION_OK) {
+	LOG_INF("Soil meter application start.");
+
+	if (hardware_init() != ERROR_OK) {
 		error();
 	}
-	
-	if (app_init(&notify_api_imp, &hardware_api_imp) != VALIDATION_OK) {
+
+	if (flash_init() != ERROR_OK) {
 		error();
 	}
+
+	if (app_init(&notify, &hardware, &flash) != ERROR_OK) {
+		error();
+	}	
+
 	
 	while(1) {
 		app_main_loop();
