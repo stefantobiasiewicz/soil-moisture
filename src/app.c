@@ -15,7 +15,7 @@ static uint16_t notification_time = 1;
 
 struct k_timer app_timer;
 
-static uint16_t map_value_battery(uint16_t battery_adc) {
+static uint16_t map_battery(int battery_adc) {
     LOG_INF("mapping battery value [%d].", battery_adc);
 
     if (battery_adc <= INPUT_MIN_BATTERY) {
@@ -94,8 +94,10 @@ static void make_measurments(struct k_timer *timer) {
     LOG_INF("making soil measurments.");
 
     int moiusture_adc = hardware.read_adc_mv_moisture();
+    int battery_adc = hardware.read_adc_mv_battery();
 
     notify.send_notification(map_soil(moiusture_adc));
+    notify.set_battery(map_battery(battery_adc));
 }
 
 
@@ -138,7 +140,13 @@ int app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardware_p,
         LOG_ERR("notify_p->send_notification is NULL.");
         return err;
     }
+    err = is_pointer_null(notify_p->set_battery);
+    if (err != ERROR_OK) {
+        LOG_ERR("notify_p->notify_set_battery is NULL.");
+        return err;
+    }
     notify.send_notification = notify_p->send_notification;
+    notify.set_battery = notify_p->set_battery;
 
 
     err = is_pointer_null(hardware_p->read_adc_mv_battery);
@@ -195,4 +203,6 @@ int app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardware_p,
 
     k_timer_init(&app_timer, make_measurments, NULL);
     k_timer_start(&app_timer, K_SECONDS(notification_time), K_SECONDS(notification_time));
+
+    return ERROR_OK;
 }

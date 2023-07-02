@@ -11,11 +11,13 @@
 #define OUTPUT_MIN_BATTERY 0
 #define OUTPUT_MAX_BATTERY 1000
 
-typedef void (*notify_api_t)(uint16_t soil_moisture);
+typedef void (*notify_soil_api_t)(uint16_t soil_moisture);
+typedef void (*notify_set_battery_t)(uint16_t battery);
 
 struct notify_api_t
 {
-    notify_api_t send_notification;
+    notify_soil_api_t send_notification;
+    notify_set_battery_t set_battery;
 };
 
 typedef int (*read_adc_mv_moisture_t)(void);

@@ -32,9 +32,14 @@ void notify_paceholder(uint16_t a) {
 	LOG_INF("nitificiation placeholder with value: [%d].", (int) a);
 }
 
+void battery_paceholder(uint16_t a) {
+	LOG_INF("battery placeholder with value: [%d].", (int) a);
+}
+
 static struct notify_api_t notify = 
 {
-    .send_notification = notify_paceholder
+    .send_notification = notify_paceholder,
+	.set_battery = battery_paceholder
 };
 
 static struct flash_api_t flash = 
