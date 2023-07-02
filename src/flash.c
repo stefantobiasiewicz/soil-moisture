@@ -17,6 +17,7 @@ static struct nvs_fs fs;
 
 
 #define SOIL_DATA_ID 1
+#define NOTIFICATION_TIME_DATA_ID 2
 
 
 int flash_init() {
@@ -74,8 +75,35 @@ int flash_read_data(soil_calibration_t* data) {
 
         LOG_WRN("data not founded in flash, writing defaults: [min: %d, max: %d].", default_value.soil_adc_min, default_value.soil_adc_max);
 
-		(void)nvs_write(&fs, SOIL_DATA_ID, &default_value, sizeof(default_value));
+		flash_write_data(default_value);
         
+        return ERROR_OK;
+	}
+}
+
+
+int flash_write_notification_time(uint16_t data) {
+    LOG_INF("writing writing notification time to flash: [time = %d].", data);
+	(void)nvs_write(&fs, NOTIFICATION_TIME_DATA_ID, &data, sizeof(uint16_t));
+}
+
+int flash_read_notification_time(uint16_t* data) {
+    LOG_INF("reading notification time form flash.");
+    
+    int rc = 0;
+
+    rc = nvs_read(&fs, NOTIFICATION_TIME_DATA_ID, data, sizeof(uint16_t));
+	if (rc > 0) {
+		LOG_INF("Id: %d, data: %s\n", NOTIFICATION_TIME_DATA_ID, data);
+        LOG_INF("data readed: [time = %d].", *data);
+        return ERROR_OK;
+	} else   {
+        uint16_t default_value = 1;
+
+        LOG_WRN("data not founded in flash, writing defaults: [time = %d].", data);
+
+        flash_write_notification_time(default_value);
+
         return ERROR_OK;
 	}
 }

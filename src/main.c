@@ -40,7 +40,9 @@ static struct notify_api_t notify =
 static struct flash_api_t flash = 
 {
 	.read_calibration_data = flash_read_data,
-	.write_calibration_data = flash_write_data
+	.write_calibration_data = flash_write_data,
+	.read_notification_time = flash_read_notification_time,
+	.write_notification_time = flash_write_notification_time
 };
 
 void error() {
