@@ -64,7 +64,7 @@ int flash_read_data(soil_calibration_t* data) {
 
     rc = nvs_read(&fs, SOIL_DATA_ID, data, sizeof(soil_calibration_t));
 	if (rc > 0) {
-		LOG_INF("Id: %d, data: %s\n", SOIL_DATA_ID, data);
+		LOG_INF("Id: %d, data: %s\n", SOIL_DATA_ID, (char* )data);
         LOG_INF("data readed: [min: %d, max: %d].", data->soil_adc_min, data->soil_adc_max);
         return ERROR_OK;
 	} else   {
@@ -83,7 +83,7 @@ int flash_read_data(soil_calibration_t* data) {
 
 
 int flash_write_notification_time(uint16_t data) {
-    LOG_INF("writing writing notification time to flash: [time = %d].", data);
+    LOG_INF("writing writing notification time to flash: [time = %d].", (int) data);
 	(void)nvs_write(&fs, NOTIFICATION_TIME_DATA_ID, &data, sizeof(uint16_t));
 }
 
@@ -94,7 +94,7 @@ int flash_read_notification_time(uint16_t* data) {
 
     rc = nvs_read(&fs, NOTIFICATION_TIME_DATA_ID, data, sizeof(uint16_t));
 	if (rc > 0) {
-		LOG_INF("Id: %d, data: %s\n", NOTIFICATION_TIME_DATA_ID, data);
+		LOG_INF("Id: %d, data: %d\n", NOTIFICATION_TIME_DATA_ID, data);
         LOG_INF("data readed: [time = %d].", *data);
         return ERROR_OK;
 	} else   {

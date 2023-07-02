@@ -13,6 +13,8 @@ static struct flash_api_t flash;
 static soil_calibration_t soil_calibration;
 static uint16_t notification_time = 1;
 
+struct k_timer app_timer;
+
 static uint16_t map_value_battery(uint16_t battery_adc) {
     LOG_INF("mapping battery value [%d].", battery_adc);
 
@@ -28,6 +30,87 @@ static uint16_t map_value_battery(uint16_t battery_adc) {
     }
 }
 
+
+uint16_t map_soil(int input)
+{
+    // Ensure that the input value is within the calibrated range
+    if (input < soil_calibration.soil_adc_min) {
+        input = soil_calibration.soil_adc_min;
+    } else if (input > soil_calibration.soil_adc_max) {
+        input = soil_calibration.soil_adc_max;
+    }
+
+    // Calculate the mapped value based on the calibrated range
+    uint16_t range = soil_calibration.soil_adc_max - soil_calibration.soil_adc_min;
+    uint16_t mapped_value = 1000 - ((input - soil_calibration.soil_adc_min) * 1000) / range;
+
+    return mapped_value;
+}
+
+/**
+ * calibration API
+*/
+void app_calibrate_start()
+{
+    LOG_INF("Starting calibration...");
+}
+
+void app_calibrate_min()
+{
+    LOG_INF("Calibrating minimum value...");
+    soil_calibration.soil_adc_min = hardware.read_adc_mv_moisture();
+}
+
+void app_calibrate_max()
+{
+    LOG_INF("Calibrating maximum value...");
+    soil_calibration.soil_adc_max = hardware.read_adc_mv_moisture();
+}
+
+void app_calibrate_end()
+{
+    LOG_INF("Calibration completed.");
+    flash.write_calibration_data(soil_calibration);
+}
+
+
+void app_set_notification_time(uint16_t seconds) {
+    LOG_INF("setting notification time: [%d] seconds.", seconds);
+
+    notification_time = seconds;
+    flash.write_notification_time(notification_time);
+    k_timer_start(&app_timer, K_SECONDS(notification_time), K_SECONDS(notification_time));
+}
+
+/**
+ * setting notification API
+*/
+uint16_t app_get_notification_time(void) {
+    LOG_INF("getting notification time: [%d] seconds.", notification_time);
+    return notification_time;
+}
+
+static void make_measurments(struct k_timer *timer) {
+    LOG_INF("making soil measurments.");
+
+    int moiusture_adc = hardware.read_adc_mv_moisture();
+
+    notify.send_notification(map_soil(moiusture_adc));
+}
+
+
+
+/**
+ * module main loop
+*/
+void app_main_loop(void) {
+
+}
+
+
+/**
+ * initalizing module
+*/
 
 int app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardware_p, struct flash_api_t * flash_p) {
     LOG_INF("app initializing.");
@@ -109,45 +192,7 @@ int app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardware_p,
     */
     flash.read_calibration_data(&soil_calibration);
     flash.read_notification_time(&notification_time);
-}
 
-
-void app_calibrate_start()
-{
-    LOG_INF("Starting calibration...");
-}
-
-void app_calibrate_min()
-{
-    LOG_INF("Calibrating minimum value...");
-    soil_calibration.soil_adc_min = hardware.read_adc_mv_moisture();
-}
-
-void app_calibrate_max()
-{
-    LOG_INF("Calibrating maximum value...");
-    soil_calibration.soil_adc_max = hardware.read_adc_mv_moisture();
-}
-
-void app_calibrate_end()
-{
-    LOG_INF("Calibration completed.");
-    flash.write_calibration_data(soil_calibration);
-}
-
-
-void app_set_notification_time(uint16_t seconds) {
-    LOG_INF("setting notification time: [%d] seconds.", seconds);
-
-    notification_time = seconds;
-    flash.write_notification_time(notification_time);
-}
-
-uint16_t app_get_notification_time(void) {
-    LOG_INF("getting notification time: [%d] seconds.", notification_time);
-    return notification_time;
-}
-
-void app_main_loop(void) {
-
+    k_timer_init(&app_timer, make_measurments, NULL);
+    k_timer_start(&app_timer, K_SECONDS(notification_time), K_SECONDS(notification_time));
 }

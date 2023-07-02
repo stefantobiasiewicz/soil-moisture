@@ -29,7 +29,7 @@ static struct hardware_api_t hardware = {
 };
 
 void notify_paceholder(uint16_t a) {
-	
+	LOG_INF("nitificiation placeholder with value: [%d].", (int) a);
 }
 
 static struct notify_api_t notify = 
@@ -71,8 +71,8 @@ void main(void)
 	while(1) {
 		app_main_loop();
 
-		printk("soil moisture = %"PRId32" mV\n", hardware_read_adc_mv_moisture());
-		printk("battery = %"PRId32" mV\n", hardware_read_adc_mv_battery());
+		// printk("soil moisture = %"PRId32" mV\n", hardware_read_adc_mv_moisture());
+		// printk("battery = %"PRId32" mV\n", hardware_read_adc_mv_battery());
 
 		k_sleep(K_MSEC(1000));
 	}
