@@ -3,8 +3,12 @@
 
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_DECLARE(app, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 
+#define CAL_START 1
+#define CAL_WET 2
+#define CAL_DRY 4
+#define CAL_END 8
 
 static struct notify_api_t notify;
 static struct hardware_api_t hardware;
@@ -19,9 +23,9 @@ static uint16_t map_battery(int battery_adc) {
     LOG_INF("mapping battery value [%d].", battery_adc);
 
     if (battery_adc <= INPUT_MIN_BATTERY) {
-        return OUTPUT_MAX_BATTERY;
-    } else if (battery_adc >= INPUT_MAX_BATTERY) {
         return OUTPUT_MIN_BATTERY;
+    } else if (battery_adc >= INPUT_MAX_BATTERY) {
+        return OUTPUT_MAX_BATTERY;
     } else {
         uint16_t outputRangeBattery = OUTPUT_MAX_BATTERY - OUTPUT_MIN_BATTERY;
         uint16_t inputRangeBattery = INPUT_MAX_BATTERY - INPUT_MIN_BATTERY;
@@ -31,8 +35,9 @@ static uint16_t map_battery(int battery_adc) {
 }
 
 
-uint16_t map_soil(int input)
+static uint16_t map_soil(int input)
 {
+    LOG_INF("mapping soil value [%d].", input);
     // Ensure that the input value is within the calibrated range
     if (input < soil_calibration.soil_adc_min) {
         input = soil_calibration.soil_adc_min;
@@ -53,24 +58,55 @@ uint16_t map_soil(int input)
 void app_calibrate_start()
 {
     LOG_INF("Starting calibration...");
+
+    /**
+     * maybe need to tourn on sensor na boost converter for calibartion 
+    */
+
 }
 
-void app_calibrate_min()
+static void app_calibrate_wet()
 {
     LOG_INF("Calibrating minimum value...");
     soil_calibration.soil_adc_min = hardware.read_adc_mv_moisture();
 }
 
-void app_calibrate_max()
+static void app_calibrate_dry()
 {
     LOG_INF("Calibrating maximum value...");
     soil_calibration.soil_adc_max = hardware.read_adc_mv_moisture();
 }
 
-void app_calibrate_end()
+static void app_calibrate_end()
 {
     LOG_INF("Calibration completed.");
     flash.write_calibration_data(soil_calibration);
+}
+
+
+void app_calibrate(uint16_t command) {
+    LOG_INF("calibration update.");
+
+    switch (command)
+    {
+    case CAL_START:
+        app_calibrate_start();
+        break;
+    case CAL_WET:
+        app_calibrate_wet();
+        break;
+    case CAL_DRY:
+        /* code */
+        app_calibrate_dry();
+        break;
+    case CAL_END:
+        app_calibrate_end();
+        break;
+    
+    default:
+        LOG_ERR("unknown calibration command.");
+        break;
+    }
 }
 
 
@@ -80,6 +116,10 @@ void app_set_notification_time(uint16_t seconds) {
     notification_time = seconds;
     flash.write_notification_time(notification_time);
     k_timer_start(&app_timer, K_SECONDS(notification_time), K_SECONDS(notification_time));
+
+    #ifdef CONFIG_THREAD_ANALYZER
+       thread_analyzer_print();
+    #endif
 }
 
 /**
@@ -114,7 +154,7 @@ void app_main_loop(void) {
  * initalizing module
 */
 
-int app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardware_p, struct flash_api_t * flash_p) {
+uint8_t app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardware_p, struct flash_api_t * flash_p) {
     LOG_INF("app initializing.");
    
     int err = is_pointer_null(notify_p);

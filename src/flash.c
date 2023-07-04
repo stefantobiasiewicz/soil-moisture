@@ -7,7 +7,7 @@
 
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_DECLARE(flash, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(flash, LOG_LEVEL_DBG);
 
 static struct nvs_fs fs;
 
@@ -41,7 +41,7 @@ int flash_init() {
 		return ERROR_FLASH_INIT;
 	}
 	fs.sector_size = info.size;
-	fs.sector_count = 2U;
+	fs.sector_count = 3U;
 
 	rc = nvs_mount(&fs);
 	if (rc) {
@@ -84,7 +84,7 @@ int flash_read_data(soil_calibration_t* data) {
 
 int flash_write_notification_time(uint16_t data) {
     LOG_INF("writing writing notification time to flash: [time = %d].", (int) data);
-	(void)nvs_write(&fs, NOTIFICATION_TIME_DATA_ID, &data, sizeof(uint16_t));
+	(void)nvs_write(&fs, NOTIFICATION_TIME_DATA_ID, &data, sizeof(data));
 }
 
 int flash_read_notification_time(uint16_t* data) {

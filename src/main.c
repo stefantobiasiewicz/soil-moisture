@@ -18,7 +18,7 @@
 #include "app.h"
 #include "error.h"
 #include "flash.h"
-
+#include "ble.h"
 
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
@@ -28,18 +28,11 @@ static struct hardware_api_t hardware = {
 	.read_adc_mv_moisture = hardware_read_adc_mv_moisture
 };
 
-void notify_paceholder(uint16_t a) {
-	LOG_INF("nitificiation placeholder with value: [%d].", (int) a);
-}
-
-void battery_paceholder(uint16_t a) {
-	LOG_INF("battery placeholder with value: [%d].", (int) a);
-}
 
 static struct notify_api_t notify = 
 {
-    .send_notification = notify_paceholder,
-	.set_battery = battery_paceholder
+    .send_notification = ble_send_notify,
+	.set_battery = ble_set_battery
 };
 
 static struct flash_api_t flash = 
@@ -48,6 +41,12 @@ static struct flash_api_t flash =
 	.write_calibration_data = flash_write_data,
 	.read_notification_time = flash_read_notification_time,
 	.write_notification_time = flash_write_notification_time
+};
+
+static struct application_api application = {
+	.app_calibrate = app_calibrate,
+	.app_get_notification_time = app_get_notification_time,
+	.app_set_notification_time = app_set_notification_time
 };
 
 void error() {
@@ -71,6 +70,10 @@ void main(void)
 	if (app_init(&notify, &hardware, &flash) != ERROR_OK) {
 		error();
 	}	
+
+	if (ble_init(&application) != ERROR_OK) {
+		error();
+	}
 
 	
 	while(1) {

@@ -5,14 +5,16 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/adc.h>
 
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(hardware, LOG_LEVEL_DBG);
+
+
 static const struct adc_dt_spec adc_soil_chan =
     ADC_DT_SPEC_GET_BY_IDX(DT_PATH(zephyr_user), 0);
 static const struct adc_dt_spec adc_vcc_chan =
     ADC_DT_SPEC_GET_BY_IDX(DT_PATH(zephyr_user), 1);
 
-static const struct adc_dt_spec adc_channels[] = {
-	adc_soil_chan, adc_vcc_chan
-};
 
 
 int hardware_init(void) {
@@ -44,6 +46,8 @@ int hardware_init(void) {
 }
 
 static int read_mv_from_adc(struct adc_dt_spec * adc) {
+    LOG_INF("hardware: reading adc form chanel with id: [%d].", adc->channel_id);
+
     int err = 0;
 
     int16_t buf;

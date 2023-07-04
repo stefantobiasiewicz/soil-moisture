@@ -11,7 +11,7 @@
 #define OUTPUT_MIN_BATTERY 0
 #define OUTPUT_MAX_BATTERY 1000
 
-typedef void (*notify_soil_api_t)(uint16_t soil_moisture);
+typedef int (*notify_soil_api_t)(uint16_t soil_moisture);
 typedef void (*notify_set_battery_t)(uint16_t battery);
 
 struct notify_api_t
@@ -42,17 +42,14 @@ struct flash_api_t
     write_notification_time_t   write_notification_time;
 };
 
-int app_init(struct notify_api_t * notify, struct hardware_api_t * hardware, struct flash_api_t * flash);
+uint8_t app_init(struct notify_api_t * notify, struct hardware_api_t * hardware, struct flash_api_t * flash);
 void app_main_loop(void);
 
 
 /**
  * calibration API
 */
-void app_calibrate_start(void);
-void app_calibrate_min(void);
-void app_calibrate_max(void);
-void app_calibrate_end(void);
+void app_calibrate(uint16_t);
 
 /**
  * notification time API
