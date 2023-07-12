@@ -44,7 +44,6 @@ struct application_api
 
 int ble_init(struct application_api * api);
 
-int ble_send_notify(uint16_t soil_value);
-void ble_set_battery(uint16_t battery_value);
+int ble_send_notify(uint16_t soil_value, uint16_t battery_value);
 
 #endif

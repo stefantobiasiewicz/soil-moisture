@@ -17,7 +17,7 @@ static struct flash_api_t flash;
 static soil_calibration_t soil_calibration;
 static uint16_t notification_time = 1;
 
-struct k_timer app_timer;
+// struct k_timer app_timer;
 
 static uint16_t map_battery(int battery_adc) {
     LOG_INF("mapping battery value [%d].", battery_adc);
@@ -115,7 +115,7 @@ void app_set_notification_time(uint16_t seconds) {
 
     notification_time = seconds;
     flash.write_notification_time(notification_time);
-    k_timer_start(&app_timer, K_SECONDS(notification_time), K_SECONDS(notification_time));
+    // k_timer_start(&app_timer, K_SECONDS(notification_time), K_SECONDS(notification_time));
 
     #ifdef CONFIG_THREAD_ANALYZER
        thread_analyzer_print();
@@ -130,14 +130,14 @@ uint16_t app_get_notification_time(void) {
     return notification_time;
 }
 
-static void make_measurments(struct k_timer *timer) {
+static void make_measurments() {
     LOG_INF("making soil measurments.");
 
-    int moiusture_adc = hardware.read_adc_mv_moisture();
     int battery_adc = hardware.read_adc_mv_battery();
 
-    notify.send_notification(map_soil(moiusture_adc));
-    notify.set_battery(map_battery(battery_adc));
+    int moiusture_adc = hardware.read_adc_mv_moisture();
+
+    notify.send_notification(map_soil(moiusture_adc), map_battery(battery_adc));
 }
 
 
@@ -146,7 +146,10 @@ static void make_measurments(struct k_timer *timer) {
  * module main loop
 */
 void app_main_loop(void) {
-
+    while(1) {
+        make_measurments();
+        k_sleep(K_SECONDS(notification_time));
+    }
 }
 
 
@@ -180,13 +183,7 @@ uint8_t app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardwar
         LOG_ERR("notify_p->send_notification is NULL.");
         return err;
     }
-    err = is_pointer_null(notify_p->set_battery);
-    if (err != ERROR_OK) {
-        LOG_ERR("notify_p->notify_set_battery is NULL.");
-        return err;
-    }
     notify.send_notification = notify_p->send_notification;
-    notify.set_battery = notify_p->set_battery;
 
 
     err = is_pointer_null(hardware_p->read_adc_mv_battery);
@@ -241,8 +238,8 @@ uint8_t app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardwar
     flash.read_calibration_data(&soil_calibration);
     flash.read_notification_time(&notification_time);
 
-    k_timer_init(&app_timer, make_measurments, NULL);
-    k_timer_start(&app_timer, K_SECONDS(notification_time), K_SECONDS(notification_time));
+    // k_timer_init(&app_timer, make_measurments, NULL);
+    // k_timer_start(&app_timer, K_SECONDS(notification_time), K_SECONDS(notification_time));
 
     return ERROR_OK;
 }

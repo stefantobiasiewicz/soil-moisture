@@ -14,8 +14,16 @@ struct bt_conn *my_conn = NULL;
 static struct application_api application;
 
 static bool notification_enabled = false;
-static uint16_t ble_soil_moisture_value = 0;
-static uint16_t ble_battery_value = 0;
+
+
+typedef struct adv_mfg_data {
+	uint16_t company_code;	    /* Company Identifier Code. */
+	uint16_t ble_soil_moisture_value;
+	uint16_t ble_battery_value;
+} manufacture_data_t;
+
+static manufacture_data_t adv_mfg_data = {0x0069, 0x0000, 0x0000};
+
 
 
 
@@ -25,6 +33,7 @@ static const struct bt_data ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 	/* STEP 4.1.3 - Set the advertising packet data  */
     BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
+	BT_DATA(BT_DATA_MANUFACTURER_DATA, &adv_mfg_data, sizeof(adv_mfg_data)),
 };
 
 
@@ -36,10 +45,16 @@ static const struct bt_data sd[] = {
 
 
 
+// static struct bt_le_adv_param *adv_param =
+// 	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE,
+// 	800,
+// 	801,
+// 	NULL);    
+// // 16380
 static struct bt_le_adv_param *adv_param =
 	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE,
-	800,
-	801,
+	5000,
+	5002,
 	NULL);
 
 
@@ -158,18 +173,18 @@ static ssize_t bt_soil_moisture_read(struct bt_conn *conn,
 					     const struct bt_gatt_attr *attr,
 					     const void *buf, uint16_t len,
 					     uint16_t offset, uint8_t flags) {
-	LOG_INF("ble: reading soil moisture value: [%d].", ble_soil_moisture_value);
+	LOG_INF("ble: reading soil moisture value: [%d].", adv_mfg_data.ble_soil_moisture_value);
 	
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, &ble_soil_moisture_value, sizeof(ble_soil_moisture_value));
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, &adv_mfg_data.ble_soil_moisture_value, sizeof(adv_mfg_data.ble_soil_moisture_value));
 }
 
 static ssize_t bt_battery_read(struct bt_conn *conn,
 					     const struct bt_gatt_attr *attr,
 					     const void *buf, uint16_t len,
 					     uint16_t offset, uint8_t flags) {
-	LOG_INF("ble: reading battery value: [%d].", ble_battery_value);
+	LOG_INF("ble: reading battery value: [%d].", adv_mfg_data.ble_battery_value);
 	
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, &ble_battery_value, sizeof(ble_battery_value));
+	return bt_gatt_attr_read(conn, attr, buf, len, offset, &adv_mfg_data.ble_battery_value, sizeof(adv_mfg_data.ble_battery_value));
 }
 
 static void soil_moisture_service_ccc_cfg_changed(const struct bt_gatt_attr *attr,
@@ -209,12 +224,17 @@ BT_GATT_SERVICE_DEFINE(soil_moisture_service,
 					NULL),
 );
 
-int ble_send_notify(uint16_t soil_value)
+int ble_send_notify(uint16_t soil_value, uint16_t battery_value)
 {
+	LOG_INF("ble: setting battery value: [%d] and soil value: [%d].", battery_value, soil_value);
+	adv_mfg_data.ble_battery_value = battery_value;
+	adv_mfg_data.ble_soil_moisture_value = soil_value;
+
+	LOG_INF("ble: updating advertisement data.");
+	bt_le_adv_update_data(ad, ARRAY_SIZE(ad),
+				sd, ARRAY_SIZE(sd));
+
 	LOG_INF("sending notification with soil value: [%d].", (int) soil_value);
-
-	ble_soil_moisture_value = soil_value;
-
 	if (!notification_enabled) {
 		LOG_WRN("notification not permited.");
 		return -EACCES;
@@ -224,11 +244,6 @@ int ble_send_notify(uint16_t soil_value)
 			      sizeof(soil_value));
 }
 
-void ble_set_battery(uint16_t battery_value) {
-	LOG_INF("setting battery value to ble module: [%d].", battery_value);
-
-	ble_battery_value = battery_value;
-}
 
 
 int ble_init(struct application_api * api) {

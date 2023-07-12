@@ -31,8 +31,7 @@ static struct hardware_api_t hardware = {
 
 static struct notify_api_t notify = 
 {
-    .send_notification = ble_send_notify,
-	.set_battery = ble_set_battery
+    .send_notification = ble_send_notify
 };
 
 static struct flash_api_t flash = 
@@ -67,21 +66,13 @@ void main(void)
 		error();
 	}
 
-	if (app_init(&notify, &hardware, &flash) != ERROR_OK) {
-		error();
-	}	
-
 	if (ble_init(&application) != ERROR_OK) {
 		error();
 	}
 
-	
-	while(1) {
-		app_main_loop();
+	if (app_init(&notify, &hardware, &flash) != ERROR_OK) {
+		error();
+	}	
 
-		// printk("soil moisture = %"PRId32" mV\n", hardware_read_adc_mv_moisture());
-		// printk("battery = %"PRId32" mV\n", hardware_read_adc_mv_battery());
-
-		k_sleep(K_MSEC(1000));
-	}
+	app_main_loop();
 }

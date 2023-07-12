@@ -10,3 +10,20 @@
 
 // For more help, browse the DeviceTree documentation at https://docs.zephyrproject.org/latest/guides/dts/index.html
 // You can also visit the nRF DeviceTree extension documentation at https://nrfconnect.github.io/vscode-nrf-connect/devicetree/nrfdevicetree.html
+/ {
+    zephyr,user{
+        signal-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+        pwms = <&pwm0 0 1000 PWM_POLARITY_NORMAL>;
+        pwm-names = "generator";
+	};
+};
+
+&timer1 {
+    status = "okay";
+
+};
+
+&pwm0 {
+    status = "okay";
+    ch0-pin = < 10 >;
+};
