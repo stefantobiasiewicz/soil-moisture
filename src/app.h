@@ -57,4 +57,14 @@ void app_set_notification_time(uint16_t seconds);
 uint16_t app_get_notification_time(void);
 
 
+/**
+ * todo
+ * 
+ * After measure inform radio module for:
+ *  - ble: start advertising measured data imidietli for 10s/20s/30s ???
+ * 
+ * 
+ * Measurmets min seconds 30s
+*/
+
 #endif
