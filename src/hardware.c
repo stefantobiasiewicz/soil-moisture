@@ -14,15 +14,26 @@ LOG_MODULE_REGISTER(hardware, LOG_LEVEL_DBG);
 
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
 
-static const struct adc_dt_spec adc_soil_chan =
-    ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USER_NODE, 0);
-static const struct adc_dt_spec adc_vcc_chan =
-    ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USER_NODE, 1);
+static const struct adc_dt_spec adc_soil_chan = ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USER_NODE, 0);
+static const struct adc_dt_spec adc_vcc_chan = ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USER_NODE, 1);
 
 const struct gpio_dt_spec sensor_power = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, signal_gpios);
 
 const struct pwm_dt_spec generator = PWM_DT_SPEC_GET_BY_NAME(ZEPHYR_USER_NODE, generator);
 
+
+/**
+ * UX
+*/
+static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET_OR(DT_ALIAS(button), gpios, {0});
+static struct gpio_callback button_cb_data;
+
+static const struct pwm_dt_spec pwm_led_r = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_r));
+static const struct pwm_dt_spec pwm_led_g = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_g));
+static const struct pwm_dt_spec pwm_led_b = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_b));
+
+
+void set_led_color(uint8_t red, uint8_t green, uint8_t blue);
 
 static void enable_sensor() {
     gpio_pin_set_dt(&sensor_power, 1);
@@ -35,6 +46,29 @@ static void disable_sensor() {
 
     pwm_set_dt(&generator, 5000 , 0); 
 }
+
+static struct k_timer pulse_timer;
+static int blue_intensity = 0;
+static int direction = 1; // Kierunek zmiany intensywności koloru (1 - wzrost, -1 - spadek)
+static uint32_t step_msec = 1;
+void pulse_blue_color_step() {
+    set_led_color(0, 0, blue_intensity);
+
+    blue_intensity += direction;
+
+    // Zmiana kierunku, gdy osiągniemy maksymalny lub minimalny poziom
+    if (blue_intensity <= 0 || blue_intensity >= 255) {
+        direction = -direction;
+    }
+}
+
+void button_pressed(const struct device *dev, struct gpio_callback *cb,
+		    uint32_t pins)
+{
+	printk("Button pressed at %" PRIu32 "\n", k_cycle_get_32());
+    pulse_blue_color_step();
+}
+
 
 
 int hardware_init(void) {
@@ -57,6 +91,12 @@ int hardware_init(void) {
 	}
 
     disable_sensor();
+    
+    /**
+     * 
+     * adc channels config
+     * 
+    */
 
 	if (!device_is_ready(adc_soil_chan.dev)) {
 		printk("ADC controller for soil device not ready\n");
@@ -80,12 +120,82 @@ int hardware_init(void) {
 		return -1;
 	}
 
+    /**
+     * 
+     * pwm led config
+     * 
+    */
+   	printk("initializing rgb led module\n");
+   	if (!device_is_ready(pwm_led_r.dev)) {
+		printk("Error: PWM device %s is not ready\n",
+		       pwm_led_r.dev->name);
+		return -1;
+	}
+
+
+   	if (!device_is_ready(pwm_led_g.dev)) {
+		printk("Error: PWM device %s is not ready\n",
+		       pwm_led_g.dev->name);
+		return -1;
+	}
+
+
+   	if (!device_is_ready(pwm_led_b.dev)) {
+		printk("Error: PWM device %s is not ready\n",
+		       pwm_led_b.dev->name);
+		return -1;
+	}
+
+    pwm_set_pulse_dt(&pwm_led_r, PWM_USEC(256));
+    pwm_set_pulse_dt(&pwm_led_g, PWM_USEC(256));
+    pwm_set_pulse_dt(&pwm_led_b, PWM_USEC(256));
+
+
+    /**
+     * 
+     * Button init
+     * 
+    */
+   if (!device_is_ready(button.port)) {
+		printk("Error: button device %s is not ready\n",
+		       button.port->name);
+		return -1;
+	}
+
+	err = gpio_pin_configure_dt(&button, GPIO_INPUT);
+	if (err != 0) {
+		printk("Error %d: failed to configure %s pin %d\n",
+		       err, button.port->name, button.pin);
+		return -1;
+	}
+
+	err = gpio_pin_interrupt_configure_dt(&button,
+					      GPIO_INT_EDGE_TO_ACTIVE);
+	if (err != 0) {
+		printk("Error %d: failed to configure interrupt on %s pin %d\n",
+			err, button.port->name, button.pin);
+		return -1;
+	}
+
+	gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin));
+	gpio_add_callback(button.port, &button_cb_data);
+	printk("Set up button at %s pin %d\n", button.port->name, button.pin);
+
+    k_timer_init(&pulse_timer, pulse_blue_color_step, NULL);
+    k_timer_start(&pulse_timer, K_MSEC(0), K_MSEC(step_msec));
+
     return err;
 }
 
 
+void set_led_color(uint8_t red, uint8_t green, uint8_t blue) {
+    pwm_set_pulse_dt(&pwm_led_r, PWM_USEC(red));
+    pwm_set_pulse_dt(&pwm_led_g, PWM_USEC(green));
+    pwm_set_pulse_dt(&pwm_led_b, PWM_USEC(blue));
+}
 
-static int read_mv_from_adc(struct adc_dt_spec * adc) {
+
+static int read_mv_from_adc(const struct adc_dt_spec * adc) {
     LOG_INF("hardware: reading adc form chanel with id: [%d].", adc->channel_id);
 
     int err = 0;

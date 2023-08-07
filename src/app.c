@@ -74,7 +74,7 @@ static void app_calibrate_wet()
 static void app_calibrate_dry()
 {
     LOG_INF("Calibrating maximum value...");
-    soil_calibration.soil_adc_max = hardware.read_adc_mv_moisture();
+    soil_calibration.soil_adc_max = hardware.read_adc_mv_moisture() + 10;
 }
 
 static void app_calibrate_end()
@@ -148,6 +148,7 @@ static void make_measurments() {
 void app_main_loop(void) {
     while(1) {
         make_measurments();
+        LOG_INF("idle stat go to sleep for: [%ds]", notification_time);
         k_sleep(K_SECONDS(notification_time));
     }
 }

@@ -29,9 +29,9 @@ struct hardware_api_t
 };
 
 typedef int (*read_calibration_data_t)(soil_calibration_t *);
-typedef int (*write_calibration_data_t)(soil_calibration_t);
+typedef void (*write_calibration_data_t)(soil_calibration_t);
 typedef int (*read_notification_time_t)(uint16_t *);
-typedef int (*write_notification_time_t)(uint16_t);
+typedef void (*write_notification_time_t)(uint16_t);
 
 struct flash_api_t
 {
@@ -65,6 +65,27 @@ uint16_t app_get_notification_time(void);
  * 
  * 
  * Measurmets min seconds 30s
+ * flow: measure -> advertising for 10s (advertising window) -> sleep for 20s->10min 
+ *          ^___________________________________________________________________|
+ * 
+ * 
+ * made general states: ? think its right to futurte migrate to zigbee
+ *  1. startup
+ *  2. sleep
+ *  3. measure
+ *  4. advetising window
+ * 
+ * 
+ * add DSP - low pass filter to battery and soil measure 
+ * like 5 - 10 measurements delay - (define variable)
+ * at startup procedure make this 5 - 10 measurments to fill the buffer/queue (warmup DSP)
+ * 
+ * 
+ * right logging -> especialy hardware module
+ * 
+ * documentation -> readme + advertising window 
+ * 
+ * warrnings -> logging 
 */
 
 #endif

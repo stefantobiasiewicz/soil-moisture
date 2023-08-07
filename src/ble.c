@@ -45,17 +45,18 @@ static const struct bt_data sd[] = {
 
 
 
-// static struct bt_le_adv_param *adv_param =
-// 	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE,
-// 	800,
-// 	801,
-// 	NULL);    
-// // 16380
 static struct bt_le_adv_param *adv_param =
 	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE,
-	5000,
-	5002,
-	NULL);
+	800,
+	801,
+	NULL);    
+// // 16380
+
+// static struct bt_le_adv_param *adv_param =
+// 	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE,
+// 	5000,
+// 	5002,
+// 	NULL);
 
 
 /* ---BLE CONNECTION--- */
@@ -115,12 +116,12 @@ static int init_radio() {
 
     bt_conn_cb_register(&connection_callbacks);
 
-    err = bt_le_adv_start(adv_param, ad, ARRAY_SIZE(ad),
-			      sd, ARRAY_SIZE(sd));
-	if (err) {
-		LOG_ERR("Advertising failed to start (err %d)\n", err);
-		return err;
-	}
+    // err = bt_le_adv_start(adv_param, ad, ARRAY_SIZE(ad),
+	// 		      sd, ARRAY_SIZE(sd));
+	// if (err) {
+	// 	LOG_ERR("Advertising failed to start (err %d)\n", err);
+	// 	return err;
+	// }
 
     return ERROR_OK;
 }
@@ -158,9 +159,9 @@ static ssize_t bt_time_interval_write(struct bt_conn *conn,
 }
 
 static ssize_t bt_time_interval_read(struct bt_conn *conn,
-					     const struct bt_gatt_attr *attr,
-					     const void *buf, uint16_t len,
-					     uint16_t offset, uint8_t flags) {
+					    const struct bt_gatt_attr *attr,
+					    void *buf, uint16_t len,
+					    uint16_t offset) {
 	LOG_INF("ble: reading time interval.");
 	
 	uint16_t value = application.app_get_notification_time();
@@ -170,18 +171,18 @@ static ssize_t bt_time_interval_read(struct bt_conn *conn,
 }
 
 static ssize_t bt_soil_moisture_read(struct bt_conn *conn,
-					     const struct bt_gatt_attr *attr,
-					     const void *buf, uint16_t len,
-					     uint16_t offset, uint8_t flags) {
+					    const struct bt_gatt_attr *attr,
+					    void *buf, uint16_t len,
+					    uint16_t offset) {
 	LOG_INF("ble: reading soil moisture value: [%d].", adv_mfg_data.ble_soil_moisture_value);
 	
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &adv_mfg_data.ble_soil_moisture_value, sizeof(adv_mfg_data.ble_soil_moisture_value));
 }
 
 static ssize_t bt_battery_read(struct bt_conn *conn,
-					     const struct bt_gatt_attr *attr,
-					     const void *buf, uint16_t len,
-					     uint16_t offset, uint8_t flags) {
+					    const struct bt_gatt_attr *attr,
+					    void *buf, uint16_t len,
+					    uint16_t offset) {
 	LOG_INF("ble: reading battery value: [%d].", adv_mfg_data.ble_battery_value);
 	
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &adv_mfg_data.ble_battery_value, sizeof(adv_mfg_data.ble_battery_value));
@@ -230,9 +231,18 @@ int ble_send_notify(uint16_t soil_value, uint16_t battery_value)
 	adv_mfg_data.ble_battery_value = battery_value;
 	adv_mfg_data.ble_soil_moisture_value = soil_value;
 
-	LOG_INF("ble: updating advertisement data.");
-	bt_le_adv_update_data(ad, ARRAY_SIZE(ad),
+	// LOG_INF("ble: updating advertisement data.");
+	// bt_le_adv_update_data(ad, ARRAY_SIZE(ad),
+	// 			sd, ARRAY_SIZE(sd));
+
+	LOG_INF("ble: starting advertising soil data.");
+    bt_le_adv_start(adv_param, ad, ARRAY_SIZE(ad),
 				sd, ARRAY_SIZE(sd));
+	
+	k_sleep(K_SECONDS(5));
+	LOG_INF("ble: stopping advertisement.");	
+	bt_le_adv_stop();
+
 
 	LOG_INF("sending notification with soil value: [%d].", (int) soil_value);
 	if (!notification_enabled) {

@@ -41,7 +41,9 @@ int flash_init() {
 		return ERROR_FLASH_INIT;
 	}
 	fs.sector_size = info.size;
-	fs.sector_count = 3U;
+	fs.sector_count = 4U;
+
+	LOG_INF("[fs.sector_size: %d, fs.sector_count: %d].", info.size, fs.sector_count);
 
 	rc = nvs_mount(&fs);
 	if (rc) {
@@ -52,9 +54,9 @@ int flash_init() {
     return ERROR_OK;
 }
 
-int flash_write_data(soil_calibration_t data) {
+void flash_write_data(soil_calibration_t data) {
     LOG_INF("writing soil calibration data form flash: [min: %d, max: %d].", data.soil_adc_min, data.soil_adc_max);
-	(void)nvs_write(&fs, SOIL_DATA_ID, &data, sizeof(data));
+	nvs_write(&fs, SOIL_DATA_ID, &data, sizeof(data));
 }
 
 int flash_read_data(soil_calibration_t* data) {
@@ -68,23 +70,21 @@ int flash_read_data(soil_calibration_t* data) {
         LOG_INF("data readed: [min: %d, max: %d].", data->soil_adc_min, data->soil_adc_max);
         return ERROR_OK;
 	} else   {
-        soil_calibration_t default_value = {
-            .soil_adc_max = 2000,
-            .soil_adc_min = 1000
-        };
+		data->soil_adc_max = 2000;
+		data->soil_adc_min = 1000;
 
-        LOG_WRN("data not founded in flash, writing defaults: [min: %d, max: %d].", default_value.soil_adc_min, default_value.soil_adc_max);
+        LOG_WRN("data not founded in flash, writing defaults: [min: %d, max: %d].", data->soil_adc_max, data->soil_adc_min);
 
-		flash_write_data(default_value);
+		flash_write_data(*data);
         
         return ERROR_OK;
 	}
 }
 
 
-int flash_write_notification_time(uint16_t data) {
+void flash_write_notification_time(uint16_t data) {
     LOG_INF("writing writing notification time to flash: [time = %d].", (int) data);
-	(void)nvs_write(&fs, NOTIFICATION_TIME_DATA_ID, &data, sizeof(data));
+	nvs_write(&fs, NOTIFICATION_TIME_DATA_ID, &data, sizeof(data));
 }
 
 int flash_read_notification_time(uint16_t* data) {
@@ -94,15 +94,15 @@ int flash_read_notification_time(uint16_t* data) {
 
     rc = nvs_read(&fs, NOTIFICATION_TIME_DATA_ID, data, sizeof(uint16_t));
 	if (rc > 0) {
-		LOG_INF("Id: %d, data: %d\n", NOTIFICATION_TIME_DATA_ID, data);
+		LOG_INF("Id: %d, data: %d\n", NOTIFICATION_TIME_DATA_ID, *data);
         LOG_INF("data readed: [time = %d].", *data);
         return ERROR_OK;
 	} else   {
-        uint16_t default_value = 1;
+        *data = 5;
 
-        LOG_WRN("data not founded in flash, writing defaults: [time = %d].", data);
+        LOG_WRN("data not founded in flash, writing defaults: [time = %d].", *data);
 
-        flash_write_notification_time(default_value);
+        flash_write_notification_time(*data);
 
         return ERROR_OK;
 	}
