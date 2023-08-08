@@ -3,6 +3,7 @@
 
 #include <zephyr/logging/log.h>
 #include <zephyr/kernel.h>
+#include <stdlib.h>
 
 LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 
@@ -10,6 +11,13 @@ LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 #define CAL_WET 2
 #define CAL_DRY 4
 #define CAL_END 8
+
+
+#define ALPHA 0.2 
+
+struct dsp_lpf_t {
+    int prev_output;
+};
 
 enum state {WORK = 0, CONNECTION, BUTTON_ACTION};
 
@@ -23,8 +31,13 @@ static uint16_t sleep_time = 1;
 static const uint8_t quick_sleep_time = 3;
 
 static uint16_t unique_id = 0;
+
 static uint16_t battery_value = 0;
+static struct dsp_lpf_t battery_filter;
+
 static uint16_t soil_value = 0;
+static struct dsp_lpf_t soil_filter;
+
 
 /**
  * application memory end
@@ -75,6 +88,31 @@ static uint16_t map_soil(int input)
 
     return mapped_value;
 } 
+
+void init_low_pass_filter(struct dsp_lpf_t *filter, int init_value) {
+    filter->prev_output = init_value;
+}
+
+int update_low_pass_filter(struct dsp_lpf_t *filter, int input) {
+    LOG_INF("dsp calcualting data input [%d].", input);
+    
+    int delta = abs(filter->prev_output - input);
+
+    LOG_INF("dsp filter delta [%d].", delta);
+
+    float alpha = ALPHA;
+
+    if(delta > 500) {
+        alpha = 0.9f;
+    }
+
+    LOG_INF("dsp filter alpha [%f].", alpha);
+    int output = alpha * input + (1 - alpha) * filter->prev_output;
+    filter->prev_output = output;
+    return output;
+}
+
+
 
 /**
  * calibration API
@@ -151,11 +189,12 @@ static void make_measurments() {
     LOG_INF("making soil measurments.");
 
     int battery_adc = hardware.read_adc_mv_battery();
+    k_sleep(K_USEC(200));
 
     int moiusture_adc = hardware.read_adc_mv_moisture();
 
-    soil_value = map_soil(moiusture_adc);
-    battery_value = map_battery(battery_adc);
+    soil_value = update_low_pass_filter(&soil_filter, map_soil(moiusture_adc));
+    battery_value = update_low_pass_filter(&battery_filter, map_battery(battery_adc));
 }
 
 
@@ -380,6 +419,13 @@ uint8_t app_init(struct ble_api_t * ble_p, struct hardware_api_t * hardware_p, s
     */
     flash.read_calibration_data(&soil_calibration);
     flash.read_sleep_time(&sleep_time);
+
+    LOG_WRN("Warm up dsp buffer START...");
+    make_measurments();
+
+    init_low_pass_filter(&soil_filter, soil_value);
+    init_low_pass_filter(&battery_filter, battery_value);
+    LOG_WRN("Warm up dsp buffer DONE...");
 
     return ERROR_OK;
 }
