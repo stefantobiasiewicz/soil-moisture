@@ -133,15 +133,15 @@ void app_calibrate(uint16_t command) {
 }
 
 
-void app_set_notification_time(uint16_t seconds) {
-    LOG_INF("setting notification time: [%d] seconds.", seconds);
+void app_set_sleep_time(uint16_t seconds) {
+    LOG_INF("setting sleep time: [%d] seconds.", seconds);
 
     sleep_time = seconds;
-    flash.write_notification_time(sleep_time);
+    flash.write_sleep_time(sleep_time);
 }
 
-uint16_t app_get_notification_time(void) {
-    LOG_INF("getting notification time: [%d] seconds.", sleep_time);
+uint16_t app_get_sleep_time(void) {
+    LOG_INF("getting sleep time: [%d] seconds.", sleep_time);
     return sleep_time;
 }
 
@@ -357,29 +357,29 @@ uint8_t app_init(struct ble_api_t * ble_p, struct hardware_api_t * hardware_p, s
         return err;
     }
 
-    err = is_pointer_null(flash_p->read_notification_time);
+    err = is_pointer_null(flash_p->read_sleep_time);
     if (err != ERROR_OK) {
-        LOG_ERR("flash_p->read_notification_time is NULL.");
+        LOG_ERR("flash_p->read_sleep_time is NULL.");
         return err;
     }
     
-    err = is_pointer_null(flash_p->write_notification_time);
+    err = is_pointer_null(flash_p->write_sleep_time);
     if (err != ERROR_OK) {
-        LOG_ERR("flash_p->write_notification_time is NULL.");
+        LOG_ERR("flash_p->write_sleep_time is NULL.");
         return err;
     }
         
     flash.read_calibration_data = flash_p->read_calibration_data;
     flash.write_calibration_data = flash_p->write_calibration_data;
-    flash.read_notification_time = flash_p->read_notification_time;
-    flash.write_notification_time = flash_p->write_notification_time;
+    flash.read_sleep_time = flash_p->read_sleep_time;
+    flash.write_sleep_time = flash_p->write_sleep_time;
 
 
     /**
      * set up application data
     */
     flash.read_calibration_data(&soil_calibration);
-    flash.read_notification_time(&sleep_time);
+    flash.read_sleep_time(&sleep_time);
 
     return ERROR_OK;
 }

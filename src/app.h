@@ -53,15 +53,15 @@ struct hardware_api_t
 
 typedef int (*read_calibration_data_t)(soil_calibration_t *);
 typedef void (*write_calibration_data_t)(soil_calibration_t);
-typedef int (*read_notification_time_t)(uint16_t *);
-typedef void (*write_notification_time_t)(uint16_t);
+typedef int (*read_sleep_time_t)(uint16_t *);
+typedef void (*write_sleep_time_t)(uint16_t);
 
 struct flash_api_t
 {
     read_calibration_data_t     read_calibration_data;
     write_calibration_data_t    write_calibration_data;
-    read_notification_time_t    read_notification_time;
-    write_notification_time_t   write_notification_time;
+    read_sleep_time_t    read_sleep_time;
+    write_sleep_time_t   write_sleep_time;
 };
 
 uint8_t app_init(struct ble_api_t * notify, struct hardware_api_t * hardware, struct flash_api_t * flash);
@@ -76,8 +76,8 @@ void app_calibrate(uint16_t);
 /**
  * notification time API
 */
-void app_set_notification_time(uint16_t seconds);
-uint16_t app_get_notification_time(void);
+void app_set_sleep_time(uint16_t seconds);
+uint16_t app_get_sleep_time(void);
 
 /**
  * radio callbacks

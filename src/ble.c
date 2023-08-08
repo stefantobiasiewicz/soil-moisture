@@ -216,7 +216,7 @@ static ssize_t bt_time_interval_write(struct bt_conn *conn,
 
 	LOG_INF("ble: seconds: %d.", val);
 
-	application.app_set_notification_time(val);
+	application.app_set_sleep_time(val);
 
 	return len;
 }
@@ -227,7 +227,7 @@ static ssize_t bt_time_interval_read(struct bt_conn *conn,
 					    uint16_t offset) {
 	LOG_INF("ble: reading time interval.");
 	
-	uint16_t value = application.app_get_notification_time();
+	uint16_t value = application.app_get_sleep_time();
 	LOG_INF("ble: seconds: %d.", value);
 
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &value, sizeof(value));
@@ -291,14 +291,14 @@ int ble_init(struct application_api * api) {
         LOG_ERR("api->app_calibrate is NULL.");
         return err;
     }
-    err = is_pointer_null(api->app_get_notification_time);
+    err = is_pointer_null(api->app_get_sleep_time);
     if (err != ERROR_OK) {
-        LOG_ERR("api->app_get_notification_time is NULL.");
+        LOG_ERR("api->app_get_sleep_time is NULL.");
         return err;
     }
-    err = is_pointer_null(api->app_set_notification_time);
+    err = is_pointer_null(api->app_set_sleep_time);
     if (err != ERROR_OK) {
-        LOG_ERR("api->app_set_notification_time is NULL.");
+        LOG_ERR("api->app_set_sleep_time is NULL.");
         return err;
     }
     err = is_pointer_null(api->app_connected);
@@ -313,8 +313,8 @@ int ble_init(struct application_api * api) {
     }
 
     application.app_calibrate = api->app_calibrate;
-    application.app_get_notification_time = api->app_get_notification_time;
-    application.app_set_notification_time = api->app_set_notification_time;
+    application.app_get_sleep_time = api->app_get_sleep_time;
+    application.app_set_sleep_time = api->app_set_sleep_time;
     application.app_connected = api->app_connected;
     application.app_disconnected = api->app_disconnected;
 

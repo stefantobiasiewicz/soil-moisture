@@ -11,10 +11,10 @@ typedef struct {
 // Inicjalizuje flash
 int flash_init();
 
-void flash_write_data(soil_calibration_t data);
-int flash_read_data(soil_calibration_t* data);
+void flash_write_calibration_data(soil_calibration_t data);
+int flash_read_calibration_data(soil_calibration_t* data);
 
-void flash_write_notification_time(uint16_t data);
-int flash_read_notification_time(uint16_t* data);
+void flash_write_sleep_time(uint16_t data);
+int flash_read_sleep_time(uint16_t* data);
 
 #endif

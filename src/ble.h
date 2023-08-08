@@ -28,10 +28,13 @@
 typedef void (*app_calibrate_t)(uint16_t command);
 
 /**
- * notification time API
+ * sleep time API
 */
-typedef void (*app_set_notification_time_t)(uint16_t seconds);
-typedef uint16_t (*app_get_notification_time_t)(void);
+typedef void (*app_set_sleep_time_t)(uint16_t seconds);
+typedef uint16_t (*app_get_sleep_time_t)(void);
+/**
+ * conection API
+*/
 typedef void (*app_connected_t)(void);
 typedef void (*app_disconnected_t)(void);
 
@@ -39,8 +42,8 @@ struct application_api
 {
     app_calibrate_t app_calibrate;
 
-    app_set_notification_time_t app_set_notification_time;
-    app_get_notification_time_t app_get_notification_time;
+    app_set_sleep_time_t app_set_sleep_time;
+    app_get_sleep_time_t app_get_sleep_time;
     app_connected_t app_connected;
     app_disconnected_t app_disconnected;
 };

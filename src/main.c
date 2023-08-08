@@ -48,16 +48,16 @@ static struct ble_api_t ble =
 
 static struct flash_api_t flash = 
 {
-	.read_calibration_data = flash_read_data,
-	.write_calibration_data = flash_write_data,
-	.read_notification_time = flash_read_notification_time,
-	.write_notification_time = flash_write_notification_time
+	.read_calibration_data = flash_read_calibration_data,
+	.write_calibration_data = flash_write_calibration_data,
+	.read_sleep_time = flash_read_sleep_time,
+	.write_sleep_time = flash_write_sleep_time
 };
 
 static struct application_api application = {
 	.app_calibrate = app_calibrate,
-	.app_get_notification_time = app_get_notification_time,
-	.app_set_notification_time = app_set_notification_time,
+	.app_get_sleep_time = app_get_sleep_time,
+	.app_set_sleep_time = app_set_sleep_time,
 	.app_connected = app_connected,
 	.app_disconnected = app_disconnected
 };

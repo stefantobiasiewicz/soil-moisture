@@ -17,7 +17,7 @@ static struct nvs_fs fs;
 
 
 #define SOIL_DATA_ID 1
-#define NOTIFICATION_TIME_DATA_ID 2
+#define SLEEP_TIME_DATA_ID 2
 
 
 int flash_init() {
@@ -54,12 +54,12 @@ int flash_init() {
     return ERROR_OK;
 }
 
-void flash_write_data(soil_calibration_t data) {
+void flash_write_calibration_data(soil_calibration_t data) {
     LOG_INF("writing soil calibration data form flash: [min: %d, max: %d].", data.soil_adc_min, data.soil_adc_max);
 	nvs_write(&fs, SOIL_DATA_ID, &data, sizeof(data));
 }
 
-int flash_read_data(soil_calibration_t* data) {
+int flash_read_calibration_data(soil_calibration_t* data) {
     LOG_INF("reading soil calibration data form flash.");
     
     int rc = 0;
@@ -75,26 +75,26 @@ int flash_read_data(soil_calibration_t* data) {
 
         LOG_WRN("data not founded in flash, writing defaults: [min: %d, max: %d].", data->soil_adc_max, data->soil_adc_min);
 
-		flash_write_data(*data);
+		flash_write_calibration_data(*data);
         
         return ERROR_OK;
 	}
 }
 
 
-void flash_write_notification_time(uint16_t data) {
-    LOG_INF("writing writing notification time to flash: [time = %d].", (int) data);
-	nvs_write(&fs, NOTIFICATION_TIME_DATA_ID, &data, sizeof(data));
+void flash_write_sleep_time(uint16_t data) {
+    LOG_INF("writing writing sleep time to flash: [time = %d].", (int) data);
+	nvs_write(&fs, SLEEP_TIME_DATA_ID, &data, sizeof(data));
 }
 
-int flash_read_notification_time(uint16_t* data) {
-    LOG_INF("reading notification time form flash.");
+int flash_read_sleep_time(uint16_t* data) {
+    LOG_INF("reading sleep time form flash.");
     
     int rc = 0;
 
-    rc = nvs_read(&fs, NOTIFICATION_TIME_DATA_ID, data, sizeof(uint16_t));
+    rc = nvs_read(&fs, SLEEP_TIME_DATA_ID, data, sizeof(uint16_t));
 	if (rc > 0) {
-		LOG_INF("Id: %d, data: %d\n", NOTIFICATION_TIME_DATA_ID, *data);
+		LOG_INF("Id: %d, data: %d\n", SLEEP_TIME_DATA_ID, *data);
         LOG_INF("data readed: [time = %d].", *data);
         return ERROR_OK;
 	} else   {
@@ -102,7 +102,7 @@ int flash_read_notification_time(uint16_t* data) {
 
         LOG_WRN("data not founded in flash, writing defaults: [time = %d].", *data);
 
-        flash_write_notification_time(*data);
+        flash_write_sleep_time(*data);
 
         return ERROR_OK;
 	}
