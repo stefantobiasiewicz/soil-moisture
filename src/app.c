@@ -209,37 +209,44 @@ void app_disconnected() {
     hardware.led_off();
 }
 
-void app_button_press() {
-    LOG_INF("app button press: BUTTON_ACTION");
-    application_state = BUTTON_ACTION;
-}
 
 
 /**
- * initalizing module
+ * ISR corelated functions
 */
+K_SEM_DEFINE(isr_sem, 0, 1);
+
+void app_button_press() {
+    LOG_INF("app button press: BUTTON_ACTION");
+    application_state = BUTTON_ACTION;
+    k_sem_give(&isr_sem);
+}
 
 void isr_thread(void *, void *, void *) {
     while (1)
     {
-        if(application_state == BUTTON_ACTION) {
-        
-            ble.ble_advertise_connection_start();
-            hardware.blue_led_pulse_start();
+        if(k_sem_take(&isr_sem, K_FOREVER) == 0) {
+            if(application_state == BUTTON_ACTION) {
+            
+                ble.ble_advertise_connection_start();
+                hardware.blue_led_pulse_start();
 
-            k_sleep(K_SECONDS(10));
-            ble.ble_advertise_connection_stop();
+                k_sleep(K_SECONDS(10));
+                ble.ble_advertise_connection_stop();
 
-            if(application_state != CONNECTION) {
-                application_state = WORK;
-                hardware.led_off();
+                if(application_state != CONNECTION) {
+                    application_state = WORK;
+                    hardware.led_off();
+                }
             }
         }
-
         k_sleep(K_MSEC(500));
     }
-    
 }
+
+/**
+ * initalizing module
+*/
 
 #define ISR_THREAD_STACK_SIZE 2048
 #define MY_PRIORITY 5
