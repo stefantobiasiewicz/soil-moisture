@@ -68,7 +68,7 @@ void pulse_blue_color_step() {
 void button_pressed(const struct device *dev, struct gpio_callback *cb,
 		    uint32_t pins)
 {
-	printk("Button pressed at %" PRIu32 "\n", k_cycle_get_32());
+	LOG_INF("Button pressed at %" PRIu32 "", k_cycle_get_32());
 
     callbacks.app_button_press();
 }
@@ -114,8 +114,7 @@ static int read_mv_from_adc(const struct adc_dt_spec * adc) {
 
     err = adc_read(adc->dev, &sequence);
     if (err < 0) {
-//todo  handle error
-        printk("Could not read (%d)\n", err);
+        LOG_ERR("Could not read (%d)", err);
         return -1;
     } 
 
@@ -124,8 +123,7 @@ static int read_mv_from_adc(const struct adc_dt_spec * adc) {
     err = adc_raw_to_millivolts_dt(adc,
                         &val_mv);
     if (err < 0) {
-//todo  handle error
-        printk(" (value in mV not available)\n");
+        LOG_ERR(" (value in mV not available)");
         return -1;
     }
 
@@ -166,18 +164,18 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
 
 
 	if (!device_is_ready(generator.dev)) {
-		printk("Pwm for soil sensor device not ready\n");
+		LOG_ERR("Pwm for soil sensor device not ready");
 		return -1;
 	}
 
 	if (!device_is_ready(sensor_power.port)) {
-		printk("Gpio for powering soil sensor device not ready\n");
+		LOG_ERR("Gpio for powering soil sensor device not ready");
 		return -1;
 	}
 
 	err = gpio_pin_configure_dt(&sensor_power, GPIO_OUTPUT);
 	if (err < 0) {
-		printk("Could not setup gpio for powering soil sensor (%d)\n", err);
+		LOG_ERR("Could not setup gpio for powering soil sensor (%d)", err);
 		return -1;
 	}
 
@@ -190,24 +188,24 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
     */
 
 	if (!device_is_ready(adc_soil_chan.dev)) {
-		printk("ADC controller for soil device not ready\n");
+		LOG_ERR("ADC controller for soil device not ready");
 		return -1;
 	}
 
 	err = adc_channel_setup_dt(&adc_soil_chan);
 	if (err < 0) {
-		printk("Could not setup adc soil channel (%d)\n", err);
+		LOG_ERR("Could not setup adc soil channel (%d)", err);
 		return -1;
 	}
 
 	if (!device_is_ready(adc_vcc_chan.dev)) {
-		printk("ADC controller for vcc device not ready\n");
+		LOG_ERR("ADC controller for vcc device not ready");
 		return -1;
 	}
 
 	err = adc_channel_setup_dt(&adc_vcc_chan);
 	if (err < 0) {
-		printk("Could not setup adc vcc channel (%d)\n", err);
+		LOG_ERR("Could not setup adc vcc channel (%d)", err);
 		return -1;
 	}
 
@@ -216,23 +214,23 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
      * pwm led config
      * 
     */
-   	printk("initializing rgb led module\n");
+   	LOG_INF("initializing rgb led module");
    	if (!device_is_ready(pwm_led_r.dev)) {
-		printk("Error: PWM device %s is not ready\n",
+		LOG_ERR("Error: PWM device %s is not ready",
 		       pwm_led_r.dev->name);
 		return -1;
 	}
 
 
    	if (!device_is_ready(pwm_led_g.dev)) {
-		printk("Error: PWM device %s is not ready\n",
+		LOG_ERR("Error: PWM device %s is not ready",
 		       pwm_led_g.dev->name);
 		return -1;
 	}
 
 
    	if (!device_is_ready(pwm_led_b.dev)) {
-		printk("Error: PWM device %s is not ready\n",
+		LOG_ERR("Error: PWM device %s is not ready",
 		       pwm_led_b.dev->name);
 		return -1;
 	}
@@ -248,14 +246,14 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
      * 
     */
    if (!device_is_ready(button.port)) {
-		printk("Error: button device %s is not ready\n",
+		LOG_ERR("Error: button device %s is not ready",
 		       button.port->name);
 		return -1;
 	}
 
 	err = gpio_pin_configure_dt(&button, GPIO_INPUT);
 	if (err != 0) {
-		printk("Error %d: failed to configure %s pin %d\n",
+		LOG_ERR("Error %d: failed to configure %s pin %d",
 		       err, button.port->name, button.pin);
 		return -1;
 	}
@@ -263,14 +261,14 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
 	err = gpio_pin_interrupt_configure_dt(&button,
 					      GPIO_INT_EDGE_TO_ACTIVE);
 	if (err != 0) {
-		printk("Error %d: failed to configure interrupt on %s pin %d\n",
+		LOG_ERR("Error %d: failed to configure interrupt on %s pin %d",
 			err, button.port->name, button.pin);
 		return -1;
 	}
 
 	gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin));
 	gpio_add_callback(button.port, &button_cb_data);
-	printk("Set up button at %s pin %d\n", button.port->name, button.pin);
+	LOG_INF("Set up button at %s pin %d", button.port->name, button.pin);
 
     k_timer_init(&pulse_timer, pulse_blue_color_step, NULL);
     hardware_led_off();
