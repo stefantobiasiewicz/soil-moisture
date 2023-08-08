@@ -2,6 +2,7 @@
 #include "error.h"
 
 #include <zephyr/logging/log.h>
+#include <zephyr/kernel.h>
 
 LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 
@@ -10,14 +11,37 @@ LOG_MODULE_REGISTER(app, LOG_LEVEL_DBG);
 #define CAL_DRY 4
 #define CAL_END 8
 
-static struct notify_api_t notify;
+enum state {WORK = 0, CONNECTION, BUTTON_ACTION};
+
+/**
+ * application logic memory start
+*/
+static enum state application_state = WORK;
+
+static soil_calibration_t soil_calibration;
+static uint16_t sleep_time = 1;
+static const uint8_t quick_sleep_time = 3;
+
+static uint16_t unique_id = 0;
+static uint16_t battery_value = 0;
+static uint16_t soil_value = 0;
+
+/**
+ * application memory end
+*/
+
+/**
+ * modules start
+*/
+
+static struct ble_api_t ble;
 static struct hardware_api_t hardware;
 static struct flash_api_t flash;
 
-static soil_calibration_t soil_calibration;
-static uint16_t notification_time = 1;
+/**
+ * modules end
+*/
 
-// struct k_timer app_timer;
 
 static uint16_t map_battery(int battery_adc) {
     LOG_INF("mapping battery value [%d].", battery_adc);
@@ -50,7 +74,7 @@ static uint16_t map_soil(int input)
     uint16_t mapped_value = 1000 - ((input - soil_calibration.soil_adc_min) * 1000) / range;
 
     return mapped_value;
-}
+} 
 
 /**
  * calibration API
@@ -96,7 +120,6 @@ void app_calibrate(uint16_t command) {
         app_calibrate_wet();
         break;
     case CAL_DRY:
-        /* code */
         app_calibrate_dry();
         break;
     case CAL_END:
@@ -113,22 +136,16 @@ void app_calibrate(uint16_t command) {
 void app_set_notification_time(uint16_t seconds) {
     LOG_INF("setting notification time: [%d] seconds.", seconds);
 
-    notification_time = seconds;
-    flash.write_notification_time(notification_time);
-    // k_timer_start(&app_timer, K_SECONDS(notification_time), K_SECONDS(notification_time));
-
-    #ifdef CONFIG_THREAD_ANALYZER
-       thread_analyzer_print();
-    #endif
+    sleep_time = seconds;
+    flash.write_notification_time(sleep_time);
 }
 
-/**
- * setting notification API
-*/
 uint16_t app_get_notification_time(void) {
-    LOG_INF("getting notification time: [%d] seconds.", notification_time);
-    return notification_time;
+    LOG_INF("getting notification time: [%d] seconds.", sleep_time);
+    return sleep_time;
 }
+
+
 
 static void make_measurments() {
     LOG_INF("making soil measurments.");
@@ -137,7 +154,8 @@ static void make_measurments() {
 
     int moiusture_adc = hardware.read_adc_mv_moisture();
 
-    notify.send_notification(map_soil(moiusture_adc), map_battery(battery_adc));
+    soil_value = map_soil(moiusture_adc);
+    battery_value = map_battery(battery_adc);
 }
 
 
@@ -147,10 +165,53 @@ static void make_measurments() {
 */
 void app_main_loop(void) {
     while(1) {
-        make_measurments();
-        LOG_INF("idle stat go to sleep for: [%ds]", notification_time);
-        k_sleep(K_SECONDS(notification_time));
+        switch (application_state)
+        {
+        case WORK:
+            make_measurments();
+
+      
+            ble.ble_advertise_not_connection_data_start(soil_value, battery_value, unique_id++);
+            k_sleep(K_SECONDS(5));
+            ble.ble_advertise_not_connection_data_stop();
+
+            LOG_INF("idle stat go to sleep for: [%ds]", sleep_time);
+            k_sleep(K_SECONDS(sleep_time));
+            break;
+        case CONNECTION:
+            make_measurments();
+
+            ble.send_notification(soil_value, battery_value);
+
+            LOG_INF("idle stat go to quick sleep for: [%ds]", quick_sleep_time);
+            k_sleep(K_SECONDS(quick_sleep_time));
+            break;   
+        default:
+            k_sleep(K_SECONDS(1));
+            break;
+        }
     }
+}
+
+void app_connected() {
+    LOG_INF("app conected via ble status: CONNECTION");
+    
+    application_state = CONNECTION;
+
+    hardware.purple_led();
+}
+
+void app_disconnected() {
+    LOG_INF("app disconected via ble status: WORK");
+
+    application_state = WORK;
+
+    hardware.led_off();
+}
+
+void app_button_press() {
+    LOG_INF("app button press: BUTTON_ACTION");
+    application_state = BUTTON_ACTION;
 }
 
 
@@ -158,12 +219,41 @@ void app_main_loop(void) {
  * initalizing module
 */
 
-uint8_t app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardware_p, struct flash_api_t * flash_p) {
+void isr_thread(void *, void *, void *) {
+    while (1)
+    {
+        if(application_state == BUTTON_ACTION) {
+        
+            ble.ble_advertise_connection_start();
+            hardware.blue_led_pulse_start();
+
+            k_sleep(K_SECONDS(10));
+            ble.ble_advertise_connection_stop();
+
+            if(application_state != CONNECTION) {
+                application_state = WORK;
+                hardware.led_off();
+            }
+        }
+
+        k_sleep(K_MSEC(500));
+    }
+    
+}
+
+#define ISR_THREAD_STACK_SIZE 2048
+#define MY_PRIORITY 5
+
+K_THREAD_DEFINE(my_tid, ISR_THREAD_STACK_SIZE,
+                isr_thread, NULL, NULL, NULL,
+                MY_PRIORITY, 0, 0);
+
+uint8_t app_init(struct ble_api_t * ble_p, struct hardware_api_t * hardware_p, struct flash_api_t * flash_p) {
     LOG_INF("app initializing.");
    
-    int err = is_pointer_null(notify_p);
+    int err = is_pointer_null(ble_p);
     if (err != ERROR_OK) {
-        LOG_ERR("notify_p is NULL.");
+        LOG_ERR("ble_p is NULL.");
         return err;
     }
 
@@ -179,12 +269,36 @@ uint8_t app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardwar
         return err;
     }
 
-    err = is_pointer_null(notify_p->send_notification);
+    err = is_pointer_null(ble_p->send_notification);
     if (err != ERROR_OK) {
-        LOG_ERR("notify_p->send_notification is NULL.");
+        LOG_ERR("ble_p->send_notification is NULL.");
         return err;
     }
-    notify.send_notification = notify_p->send_notification;
+    err = is_pointer_null(ble_p->ble_advertise_connection_start);
+    if (err != ERROR_OK) {
+        LOG_ERR("ble_p->ble_advertise_connection_start is NULL.");
+        return err;
+    }
+    err = is_pointer_null(ble_p->ble_advertise_connection_stop);
+    if (err != ERROR_OK) {
+        LOG_ERR("ble_p->ble_advertise_connection_stop is NULL.");
+        return err;
+    }
+    err = is_pointer_null(ble_p->ble_advertise_not_connection_data_start);
+    if (err != ERROR_OK) {
+        LOG_ERR("ble_p->ble_advertise_not_connection_data_start is NULL.");
+        return err;
+    }
+    err = is_pointer_null(ble_p->ble_advertise_not_connection_data_stop);
+    if (err != ERROR_OK) {
+        LOG_ERR("ble_p->ble_advertise_not_connection_data_stop is NULL.");
+        return err;
+    }
+    ble.send_notification = ble_p->send_notification;
+    ble.ble_advertise_connection_start = ble_p->ble_advertise_connection_start;
+    ble.ble_advertise_connection_stop = ble_p->ble_advertise_connection_stop;
+    ble.ble_advertise_not_connection_data_start = ble_p->ble_advertise_not_connection_data_start;
+    ble.ble_advertise_not_connection_data_stop = ble_p->ble_advertise_not_connection_data_stop;
 
 
     err = is_pointer_null(hardware_p->read_adc_mv_battery);
@@ -199,8 +313,29 @@ uint8_t app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardwar
         return err;
     }
     
+    err = is_pointer_null(hardware_p->blue_led_pulse_start);
+    if (err != ERROR_OK) {
+        LOG_ERR("hardware_p->blue_led_pulse_start is NULL.");
+        return err;
+    }
+    
+    err = is_pointer_null(hardware_p->purple_led);
+    if (err != ERROR_OK) {
+        LOG_ERR("hardware_p->purple_led is NULL.");
+        return err;
+    }
+    
+    err = is_pointer_null(hardware_p->led_off);
+    if (err != ERROR_OK) {
+        LOG_ERR("hardware_p->led_off is NULL.");
+        return err;
+    }
+    
     hardware.read_adc_mv_battery = hardware_p->read_adc_mv_battery;
     hardware.read_adc_mv_moisture = hardware_p->read_adc_mv_moisture;
+    hardware.blue_led_pulse_start = hardware_p->blue_led_pulse_start;
+    hardware.purple_led = hardware_p->purple_led;
+    hardware.led_off = hardware_p->led_off;
 
 
     err = is_pointer_null(flash_p->read_calibration_data);
@@ -237,10 +372,7 @@ uint8_t app_init(struct notify_api_t * notify_p, struct hardware_api_t * hardwar
      * set up application data
     */
     flash.read_calibration_data(&soil_calibration);
-    flash.read_notification_time(&notification_time);
-
-    // k_timer_init(&app_timer, make_measurments, NULL);
-    // k_timer_start(&app_timer, K_SECONDS(notification_time), K_SECONDS(notification_time));
+    flash.read_notification_time(&sleep_time);
 
     return ERROR_OK;
 }

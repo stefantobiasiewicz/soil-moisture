@@ -10,25 +10,93 @@
 
 LOG_MODULE_REGISTER(ble, LOG_LEVEL_DBG);
 
+
+static ssize_t bt_calibration(struct bt_conn *conn,
+					     const struct bt_gatt_attr *attr,
+					     const void *buf, uint16_t len,
+					     uint16_t offset, uint8_t flags);
+
+static ssize_t bt_time_interval_read(struct bt_conn *conn,
+					    const struct bt_gatt_attr *attr,
+					    void *buf, uint16_t len,
+					    uint16_t offset);		
+
+static ssize_t bt_time_interval_write(struct bt_conn *conn,
+					     const struct bt_gatt_attr *attr,
+					     const void *buf, uint16_t len,
+					     uint16_t offset, uint8_t flags);
+
+static void soil_moisture_service_ccc_cfg_changed(const struct bt_gatt_attr *attr,
+				  uint16_t value);
+
+static ssize_t bt_soil_moisture_read(struct bt_conn *conn,
+					    const struct bt_gatt_attr *attr,
+					    void *buf, uint16_t len,
+					    uint16_t offset);		
+
+static ssize_t bt_battery_read(struct bt_conn *conn,
+					    const struct bt_gatt_attr *attr,
+					    void *buf, uint16_t len,
+					    uint16_t offset);		
+																		 
+
+BT_GATT_SERVICE_DEFINE(soil_moisture_service,
+	BT_GATT_PRIMARY_SERVICE(BT_UUID_SOIL_MOISTURE_SERVICE),
+	BT_GATT_CHARACTERISTIC(BT_UUID_CALIBRATION,
+					(BT_GATT_CHRC_WRITE),
+					(BT_GATT_PERM_WRITE), 
+					NULL, 
+					bt_calibration,
+					NULL),
+	BT_GATT_CHARACTERISTIC(BT_UUID_TIME_INTERVAL,
+					(BT_GATT_CHRC_WRITE | BT_GATT_CHRC_READ),
+					(BT_GATT_PERM_WRITE | BT_GATT_PERM_READ),
+					bt_time_interval_read,
+					bt_time_interval_write,
+					NULL),
+	BT_GATT_CHARACTERISTIC(BT_UUID_SOIL_MOISTURE,
+					(BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY),
+					BT_GATT_PERM_READ,
+					bt_soil_moisture_read,
+					NULL,
+					NULL),
+    BT_GATT_CCC(soil_moisture_service_ccc_cfg_changed,
+		            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
+	BT_GATT_CHARACTERISTIC(BT_UUID_BATTERY_LEVEL,
+					BT_GATT_CHRC_READ,
+					BT_GATT_PERM_READ,
+					bt_battery_read,
+					NULL,
+					NULL),
+);
+
 struct bt_conn *my_conn = NULL;
 static struct application_api application;
 
 static bool notification_enabled = false;
 
-
 typedef struct adv_mfg_data {
 	uint16_t company_code;	    /* Company Identifier Code. */
 	uint16_t ble_soil_moisture_value;
 	uint16_t ble_battery_value;
+	uint16_t unique_id
 } manufacture_data_t;
 
-static manufacture_data_t adv_mfg_data = {0x0069, 0x0000, 0x0000};
+static manufacture_data_t adv_mfg_data = {0x0069, 0x0000, 0x0000, 0x0000};
 
 
 
 
-/*advertising packet*/
-static const struct bt_data ad[] = {
+/*advertising packet for connection*/
+static const struct bt_data ad_connection[] = {
+	/* STEP 4.1.2 - Set the advertising flags */    
+    BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
+	/* STEP 4.1.3 - Set the advertising packet data  */
+    BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
+};
+
+/*advertising packet wuth data*/
+static const struct bt_data ad_data[] = {
 	/* STEP 4.1.2 - Set the advertising flags */    
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 	/* STEP 4.1.3 - Set the advertising packet data  */
@@ -45,18 +113,17 @@ static const struct bt_data sd[] = {
 
 
 
-static struct bt_le_adv_param *adv_param =
+static struct bt_le_adv_param *adv_param_connection =
 	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE,
 	800,
 	801,
 	NULL);    
-// // 16380
 
-// static struct bt_le_adv_param *adv_param =
-// 	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE,
-// 	5000,
-// 	5002,
-// 	NULL);
+static struct bt_le_adv_param *adv_param_data =
+	BT_LE_ADV_PARAM(BT_LE_ADV_OPT_USE_IDENTITY,
+	800,
+	801,
+	NULL);    
 
 
 /* ---BLE CONNECTION--- */
@@ -68,6 +135,8 @@ static void on_connected(struct bt_conn *conn, uint8_t err)
     }
     LOG_INF("Connected");
     my_conn = bt_conn_ref(conn);
+
+	application.app_connected();
     
     struct bt_conn_info info;
     err = bt_conn_get_info(conn, &info);
@@ -83,6 +152,7 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason)
 {
     LOG_INF("Disconnected. Reason %d", reason);
     bt_conn_unref(my_conn);
+	application.app_disconnected();
 }
 
 static struct bt_conn_cb connection_callbacks = {
@@ -115,13 +185,6 @@ static int init_radio() {
     }   
 
     bt_conn_cb_register(&connection_callbacks);
-
-    // err = bt_le_adv_start(adv_param, ad, ARRAY_SIZE(ad),
-	// 		      sd, ARRAY_SIZE(sd));
-	// if (err) {
-	// 	LOG_ERR("Advertising failed to start (err %d)\n", err);
-	// 	return err;
-	// }
 
     return ERROR_OK;
 }
@@ -195,53 +258,11 @@ static void soil_moisture_service_ccc_cfg_changed(const struct bt_gatt_attr *att
 }
 
 
-BT_GATT_SERVICE_DEFINE(soil_moisture_service,
-	BT_GATT_PRIMARY_SERVICE(BT_UUID_SOIL_MOISTURE_SERVICE),
-	BT_GATT_CHARACTERISTIC(BT_UUID_CALIBRATION,
-					(BT_GATT_CHRC_WRITE),
-					(BT_GATT_PERM_WRITE), 
-					NULL, 
-					bt_calibration,
-					NULL),
-	BT_GATT_CHARACTERISTIC(BT_UUID_TIME_INTERVAL,
-					(BT_GATT_CHRC_WRITE | BT_GATT_CHRC_READ),
-					(BT_GATT_PERM_WRITE | BT_GATT_PERM_READ),
-					bt_time_interval_read,
-					bt_time_interval_write,
-					NULL),
-	BT_GATT_CHARACTERISTIC(BT_UUID_SOIL_MOISTURE,
-					(BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY),
-					BT_GATT_PERM_READ,
-					bt_soil_moisture_read,
-					NULL,
-					NULL),
-    BT_GATT_CCC(soil_moisture_service_ccc_cfg_changed,
-		            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-	BT_GATT_CHARACTERISTIC(BT_UUID_BATTERY_LEVEL,
-					BT_GATT_CHRC_READ,
-					BT_GATT_PERM_READ,
-					bt_battery_read,
-					NULL,
-					NULL),
-);
-
 int ble_send_notify(uint16_t soil_value, uint16_t battery_value)
 {
 	LOG_INF("ble: setting battery value: [%d] and soil value: [%d].", battery_value, soil_value);
 	adv_mfg_data.ble_battery_value = battery_value;
 	adv_mfg_data.ble_soil_moisture_value = soil_value;
-
-	// LOG_INF("ble: updating advertisement data.");
-	// bt_le_adv_update_data(ad, ARRAY_SIZE(ad),
-	// 			sd, ARRAY_SIZE(sd));
-
-	LOG_INF("ble: starting advertising soil data.");
-    bt_le_adv_start(adv_param, ad, ARRAY_SIZE(ad),
-				sd, ARRAY_SIZE(sd));
-	
-	k_sleep(K_SECONDS(5));
-	LOG_INF("ble: stopping advertisement.");	
-	bt_le_adv_stop();
 
 
 	LOG_INF("sending notification with soil value: [%d].", (int) soil_value);
@@ -280,10 +301,77 @@ int ble_init(struct application_api * api) {
         LOG_ERR("api->app_set_notification_time is NULL.");
         return err;
     }
+    err = is_pointer_null(api->app_connected);
+    if (err != ERROR_OK) {
+        LOG_ERR("api->app_connected is NULL.");
+        return err;
+    }
+    err = is_pointer_null(api->app_disconnected);
+    if (err != ERROR_OK) {
+        LOG_ERR("api->app_disconnected is NULL.");
+        return err;
+    }
 
     application.app_calibrate = api->app_calibrate;
     application.app_get_notification_time = api->app_get_notification_time;
     application.app_set_notification_time = api->app_set_notification_time;
+    application.app_connected = api->app_connected;
+    application.app_disconnected = api->app_disconnected;
 
     return init_radio();
 }
+
+K_SEM_DEFINE(avetising_sem, 1, 1);
+
+int ble_advertise_connection_start() {
+	if (k_sem_take(&avetising_sem, K_FOREVER) == 0) {
+		LOG_INF("ble: start advetising connection");
+		int err = bt_le_adv_start(adv_param_connection, ad_connection, ARRAY_SIZE(ad_connection),
+					sd, ARRAY_SIZE(sd));
+		if (err) {
+			LOG_ERR("Advertising failed to start (err %d)\n", err);
+			return err;
+		}
+	}
+
+	return ERROR_OK;
+}
+
+int ble_advertise_connection_stop() {
+	LOG_INF("ble: stop advetising connection");
+	int err = bt_le_adv_stop();
+	
+	k_sem_give(&avetising_sem);
+
+	return err;
+}
+
+
+int ble_advertise_not_connection_data_start(uint16_t soil_value, uint16_t battery_value, uint16_t id) {
+	LOG_INF("ble: setting battery value: [%d] and soil value: [%d] and unique_id: [%d].", battery_value, soil_value, id);
+	adv_mfg_data.ble_battery_value = battery_value;
+	adv_mfg_data.ble_soil_moisture_value = soil_value;
+	adv_mfg_data.unique_id = id;
+
+	if (k_sem_take(&avetising_sem, K_FOREVER) == 0) {
+		LOG_INF("ble: start advetising soil data");
+		int err = bt_le_adv_start(adv_param_data, ad_data, ARRAY_SIZE(ad_data),
+					sd, ARRAY_SIZE(sd));
+		if (err) {
+			LOG_ERR("Advertising failed to start (err %d)\n", err);
+			return err;
+		}
+	}
+
+	return ERROR_OK;
+}
+
+int ble_advertise_not_connection_data_stop() {
+	LOG_INF("ble: stop advetising soil data");
+	int err = bt_le_adv_stop();
+	
+	k_sem_give(&avetising_sem);
+
+	return err;
+}
+

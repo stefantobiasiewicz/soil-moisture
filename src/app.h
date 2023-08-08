@@ -14,18 +14,41 @@
 typedef int (*notify_soil_api_t)(uint16_t soil_moisture, uint16_t battery);
 
 
-struct notify_api_t
+typedef int (*ble_advertise_connection_start_t)();
+typedef int (*ble_advertise_connection_stop_t)();
+
+/**
+ * advertising soil and battery data
+*/
+typedef int (*ble_advertise_not_connection_data_start_t)(uint16_t soil_value, uint16_t battery_value, uint16_t id);
+typedef int (*ble_advertise_not_connection_data_stop_t)();
+
+struct ble_api_t
 {
     notify_soil_api_t send_notification;
+
+    ble_advertise_connection_start_t ble_advertise_connection_start;
+    ble_advertise_connection_stop_t ble_advertise_connection_stop;
+    ble_advertise_not_connection_data_start_t ble_advertise_not_connection_data_start;
+    ble_advertise_not_connection_data_stop_t ble_advertise_not_connection_data_stop;
 };
 
 typedef int (*read_adc_mv_moisture_t)(void);
 typedef int (*read_adc_mv_battery_t)(void);
+typedef int (*blue_led_pulse_start_t)(void);
+typedef int (*purple_led_t)(void);
+typedef int (*led_off_t)(void);
+
+
 
 struct hardware_api_t
 {
     read_adc_mv_moisture_t    read_adc_mv_moisture;
     read_adc_mv_battery_t     read_adc_mv_battery;
+
+    blue_led_pulse_start_t    blue_led_pulse_start;
+    purple_led_t purple_led;
+    led_off_t     led_off;
 };
 
 typedef int (*read_calibration_data_t)(soil_calibration_t *);
@@ -41,7 +64,7 @@ struct flash_api_t
     write_notification_time_t   write_notification_time;
 };
 
-uint8_t app_init(struct notify_api_t * notify, struct hardware_api_t * hardware, struct flash_api_t * flash);
+uint8_t app_init(struct ble_api_t * notify, struct hardware_api_t * hardware, struct flash_api_t * flash);
 void app_main_loop(void);
 
 
@@ -56,36 +79,17 @@ void app_calibrate(uint16_t);
 void app_set_notification_time(uint16_t seconds);
 uint16_t app_get_notification_time(void);
 
+/**
+ * radio callbacks
+*/
+
+void app_connected();
+void app_disconnected();
 
 /**
- * todo
- * 
- * After measure inform radio module for:
- *  - ble: start advertising measured data imidietli for 10s/20s/30s ???
- * 
- * 
- * Measurmets min seconds 30s
- * flow: measure -> advertising for 10s (advertising window) -> sleep for 20s->10min 
- *          ^___________________________________________________________________|
- * 
- * 
- * made general states: ? think its right to futurte migrate to zigbee
- *  1. startup
- *  2. sleep
- *  3. measure
- *  4. advetising window
- * 
- * 
- * add DSP - low pass filter to battery and soil measure 
- * like 5 - 10 measurements delay - (define variable)
- * at startup procedure make this 5 - 10 measurments to fill the buffer/queue (warmup DSP)
- * 
- * 
- * right logging -> especialy hardware module
- * 
- * documentation -> readme + advertising window 
- * 
- * warrnings -> logging 
+ * UX api 
 */
+void app_button_press();
+
 
 #endif

@@ -25,13 +25,25 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 static struct hardware_api_t hardware = {
     .read_adc_mv_battery = hardware_read_adc_mv_battery,
-	.read_adc_mv_moisture = hardware_read_adc_mv_moisture
+	.read_adc_mv_moisture = hardware_read_adc_mv_moisture,
+
+	.blue_led_pulse_start = hardware_blue_led_pulse_start,
+	.led_off = hardware_led_off,
+	.purple_led = hardware_purple_led
+};
+
+static struct hardware_callback_t hardware_callbacks = {
+	.app_button_press = app_button_press
 };
 
 
-static struct notify_api_t notify = 
+static struct ble_api_t ble = 
 {
-    .send_notification = ble_send_notify
+    .send_notification = ble_send_notify,
+	.ble_advertise_connection_start = ble_advertise_connection_start,
+	.ble_advertise_connection_stop = ble_advertise_connection_stop,
+	.ble_advertise_not_connection_data_start = ble_advertise_not_connection_data_start,
+	.ble_advertise_not_connection_data_stop = ble_advertise_not_connection_data_stop
 };
 
 static struct flash_api_t flash = 
@@ -45,7 +57,9 @@ static struct flash_api_t flash =
 static struct application_api application = {
 	.app_calibrate = app_calibrate,
 	.app_get_notification_time = app_get_notification_time,
-	.app_set_notification_time = app_set_notification_time
+	.app_set_notification_time = app_set_notification_time,
+	.app_connected = app_connected,
+	.app_disconnected = app_disconnected
 };
 
 void error() {
@@ -58,7 +72,7 @@ void main(void)
 {	
 	LOG_INF("Soil meter application start.");
 
-	if (hardware_init() != ERROR_OK) {
+	if (hardware_init(&hardware_callbacks) != ERROR_OK) {
 		error();
 	}
 
@@ -70,7 +84,7 @@ void main(void)
 		error();
 	}
 
-	if (app_init(&notify, &hardware, &flash) != ERROR_OK) {
+	if (app_init(&ble, &hardware, &flash) != ERROR_OK) {
 		error();
 	}	
 

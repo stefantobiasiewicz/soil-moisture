@@ -32,6 +32,8 @@ typedef void (*app_calibrate_t)(uint16_t command);
 */
 typedef void (*app_set_notification_time_t)(uint16_t seconds);
 typedef uint16_t (*app_get_notification_time_t)(void);
+typedef void (*app_connected_t)(void);
+typedef void (*app_disconnected_t)(void);
 
 struct application_api
 {
@@ -39,11 +41,28 @@ struct application_api
 
     app_set_notification_time_t app_set_notification_time;
     app_get_notification_time_t app_get_notification_time;
+    app_connected_t app_connected;
+    app_disconnected_t app_disconnected;
 };
 
 
 int ble_init(struct application_api * api);
 
+/**
+ * advetising for connection and setup parameters
+*/
+int ble_advertise_connection_start();
+int ble_advertise_connection_stop();
+
+/**
+ * advertising soil and battery data
+*/
+int ble_advertise_not_connection_data_start(uint16_t soil_value, uint16_t battery_value, uint16_t id);
+int ble_advertise_not_connection_data_stop();
+
+/**
+ * notifiing soil and battery data when connection
+*/
 int ble_send_notify(uint16_t soil_value, uint16_t battery_value);
 
 #endif
