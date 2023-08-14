@@ -79,7 +79,7 @@ typedef struct adv_mfg_data {
 	uint16_t company_code;	    /* Company Identifier Code. */
 	uint16_t ble_soil_moisture_value;
 	uint16_t ble_battery_value;
-	uint16_t unique_id
+	uint16_t unique_id;
 } manufacture_data_t;
 
 static manufacture_data_t adv_mfg_data = {0x0069, 0x0000, 0x0000, 0x0000};

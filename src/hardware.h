@@ -19,8 +19,8 @@ int hardware_read_adc_mv_battery(void);
 
 void set_led_color(uint8_t red, uint8_t green, uint8_t blue);
 
-int hardware_blue_led_pulse_start(void);
-int hardware_purple_led(void);
-int hardware_led_off(void);
+void hardware_blue_led_pulse_start(void);
+void hardware_purple_led(void);
+void hardware_led_off(void);
 
 #endif

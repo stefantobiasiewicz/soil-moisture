@@ -81,16 +81,16 @@ void set_led_color(uint8_t red, uint8_t green, uint8_t blue) {
 }
 
 
-int hardware_led_off(void) {
+void hardware_led_off(void) {
     k_timer_stop(&pulse_timer);
     set_led_color(0,0,0);
 }
 
-int hardware_blue_led_pulse_start(void) {
+void hardware_blue_led_pulse_start(void) {
     k_timer_start(&pulse_timer, K_MSEC(0), K_MSEC(step_msec));
 }
 
-int hardware_purple_led(void) {
+void hardware_purple_led(void) {
     hardware_led_off();
 
     set_led_color(255,0,255);

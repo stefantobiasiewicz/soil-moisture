@@ -208,7 +208,6 @@ void app_main_loop(void) {
         {
         case WORK:
             make_measurments();
-
       
             ble.ble_advertise_not_connection_data_start(soil_value, battery_value, unique_id++);
             k_sleep(K_SECONDS(5));

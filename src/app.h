@@ -35,9 +35,9 @@ struct ble_api_t
 
 typedef int (*read_adc_mv_moisture_t)(void);
 typedef int (*read_adc_mv_battery_t)(void);
-typedef int (*blue_led_pulse_start_t)(void);
-typedef int (*purple_led_t)(void);
-typedef int (*led_off_t)(void);
+typedef void (*blue_led_pulse_start_t)(void);
+typedef void (*purple_led_t)(void);
+typedef void (*led_off_t)(void);
 
 
 
