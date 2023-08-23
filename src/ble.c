@@ -10,6 +10,7 @@
 
 LOG_MODULE_REGISTER(ble, LOG_LEVEL_DBG);
 
+#define APP_VERSION 0x0005
 
 static ssize_t bt_calibration(struct bt_conn *conn,
 					     const struct bt_gatt_attr *attr,
@@ -76,13 +77,13 @@ static struct application_api application;
 static bool notification_enabled = false;
 
 typedef struct adv_mfg_data {
-	uint16_t company_code;	    /* Company Identifier Code. */
+	uint16_t version;	    /* Company Identifier Code. */
 	uint16_t ble_soil_moisture_value;
 	uint16_t ble_battery_value;
 	uint16_t unique_id;
 } manufacture_data_t;
 
-static manufacture_data_t adv_mfg_data = {0x0069, 0x0000, 0x0000, 0x0000};
+static manufacture_data_t adv_mfg_data = {APP_VERSION, 0x0000, 0x0000, 0x0000};
 
 
 
@@ -99,8 +100,6 @@ static const struct bt_data ad_connection[] = {
 static const struct bt_data ad_data[] = {
 	/* STEP 4.1.2 - Set the advertising flags */    
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-	/* STEP 4.1.3 - Set the advertising packet data  */
-    BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME, sizeof(CONFIG_BT_DEVICE_NAME) - 1),
 	BT_DATA(BT_DATA_MANUFACTURER_DATA, &adv_mfg_data, sizeof(adv_mfg_data)),
 };
 
