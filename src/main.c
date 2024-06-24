@@ -68,8 +68,26 @@ void error() {
 	sys_reboot(0);
 }
 
-void main(void)
+int main(void)
 {	
+	/**
+	 * for tests
+	*/
+	// LOG_WRN("TEST APLICATION FOR VOLTAGE TEST");
+
+	// if (hardware_init(&hardware_callbacks) != ERROR_OK) {
+	// 	error();
+	// }
+
+	// while (1) {
+	// 	int battery_mv = hardware_read_adc_mv_battery();
+	// 	int soil_mv = hardware_read_adc_mv_moisture();
+
+	// 	LOG_INF("[batery, soil]: [%d,%d]", battery_mv, soil_mv);
+	// 	k_sleep(K_MSEC(500));
+	// }
+
+
 	LOG_INF("Soil meter application start.");
 
 	if (hardware_init(&hardware_callbacks) != ERROR_OK) {
@@ -89,4 +107,6 @@ void main(void)
 	}	
 
 	app_main_loop();
+
+	return 0;
 }

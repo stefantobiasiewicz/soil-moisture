@@ -133,7 +133,7 @@ static int read_mv_from_adc(const struct adc_dt_spec * adc) {
 
 int hardware_read_adc_mv_moisture(void) {
     enable_sensor();
-    k_sleep(K_MSEC(30));
+    k_sleep(K_MSEC(200));
     
     int result = read_mv_from_adc(&adc_soil_chan);
 

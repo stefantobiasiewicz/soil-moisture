@@ -83,7 +83,17 @@ typedef struct adv_mfg_data {
 	uint16_t unique_id;
 } manufacture_data_t;
 
-static manufacture_data_t adv_mfg_data = {APP_VERSION, 0x0000, 0x0000, 0x0000};
+static manufacture_data_t adv_mfg_data = {0x0005, 0x0000, 0x0000, 0x0000};
+
+typedef struct {
+	uint16_t uuid;	
+	uint16_t version;
+	uint16_t ble_soil_moisture_value;
+	uint16_t ble_battery_value;
+	uint16_t unique_id;
+} service_data_t;
+
+static service_data_t service_data = {0x55aa, 0x0006, 0x0001, 0x0003, 0x0005};
 
 
 
@@ -101,6 +111,7 @@ static const struct bt_data ad_data[] = {
 	/* STEP 4.1.2 - Set the advertising flags */    
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 	BT_DATA(BT_DATA_MANUFACTURER_DATA, &adv_mfg_data, sizeof(adv_mfg_data)),
+	BT_DATA(BT_DATA_SVC_DATA16, &service_data, sizeof(service_data)),
 };
 
 

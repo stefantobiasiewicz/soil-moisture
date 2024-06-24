@@ -71,23 +71,85 @@ static uint16_t map_battery(int battery_adc) {
     }
 }
 
+//todo reduce tabeles to one
+struct CalibrationPoint {
+    float sensorValue;
+    float batteryValue;
+};
 
-static uint16_t map_soil(int input)
-{
-    LOG_INF("mapping soil value [%d].", input);
-    // Ensure that the input value is within the calibrated range
-    if (input < soil_calibration.soil_adc_min) {
-        input = soil_calibration.soil_adc_min;
-    } else if (input > soil_calibration.soil_adc_max) {
-        input = soil_calibration.soil_adc_max;
+// Tablice punktów kalibracyjnych dla 0% i 100%
+struct CalibrationPoint calibration0[] = {
+    {2504, 3000.0},
+    {2501, 2900.0},
+    {2509, 2800.0},
+    {2511, 2700.0},
+    {2506, 2600.0},
+    {2545, 2500.0},
+    {2511, 2400.0},
+    {2516, 2300.0},
+    {2496, 2200.0},
+    {2438, 2100.0},
+    {2347, 2000.0},
+    {2249, 1900.0},
+    {2139, 1800.0}
+};
+
+struct CalibrationPoint calibration100[] = {
+    {969, 3000.0},
+    {987, 2900.0},
+    {990, 2800.0},
+    {996, 2700.0},
+    {1001, 2600.0},
+    {1017, 2500.0},
+    {1004, 2400.0},
+    {1032, 2300.0},
+    {1032, 2200.0},
+    {1040, 2100.0},
+    {1067, 2000.0},
+    {1084, 1900.0},
+    {1101, 1800.0}
+};
+
+#define NUM_CALIBRATION_POINTS 13
+
+
+int map_soil(uint16_t sensorValue, uint16_t batteryValue) {
+    LOG_INF("mapping soil value [%d].", sensorValue);
+    
+    const struct CalibrationPoint *lower0 = NULL;
+    const struct CalibrationPoint *upper100 = NULL;
+
+    if (sensorValue < 1101) {
+        return 0;
+    } else if (sensorValue > 2504) {
+        return 1000;
     }
 
-    // Calculate the mapped value based on the calibrated range
-    uint16_t range = soil_calibration.soil_adc_max - soil_calibration.soil_adc_min;
-    uint16_t mapped_value = 1000 - ((input - soil_calibration.soil_adc_min) * 1000) / range;
+    for (int i = 0; i < NUM_CALIBRATION_POINTS - 1; i++) {
+        if (batteryValue <= calibration100[i].batteryValue) {
+            lower0 = &calibration0[i];
+        }
+        if (batteryValue <= calibration100[i].batteryValue) {
+            upper100 = &calibration100[i];
+        }
 
-    return mapped_value;
-} 
+        if (lower0 && upper100) {
+            break;
+        }
+    }
+
+    if (!lower0 || !upper100) {
+        return (sensorValue < calibration0[0].sensorValue) ? 0 : 1000;
+    }
+
+    float rangeSensor = (float)(upper100->sensorValue - lower0->sensorValue);
+    float normalizedValue = (float)(sensorValue - lower0->sensorValue) / rangeSensor;
+
+    int mappedValue = (int)(normalizedValue * 1000);
+
+    return mappedValue;
+}
+
 
 void init_low_pass_filter(struct dsp_lpf_t *filter, int init_value) {
     filter->prev_output = init_value;
@@ -193,7 +255,7 @@ static void make_measurments() {
 
     int moiusture_adc = hardware.read_adc_mv_moisture();
 
-    soil_value = update_low_pass_filter(&soil_filter, map_soil(moiusture_adc));
+    soil_value = update_low_pass_filter(&soil_filter, map_soil(moiusture_adc, battery_adc));
     battery_value = update_low_pass_filter(&battery_filter, map_battery(battery_adc));
 }
 
