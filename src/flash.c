@@ -3,7 +3,7 @@
 #include <zephyr/fs/nvs.h>
 
 #include "flash.h"
-#include "error.h"
+#include "main.h"
 
 #include <zephyr/logging/log.h>
 
@@ -55,7 +55,7 @@ int flash_init() {
 }
 
 void flash_write_calibration_data(soil_calibration_t data) {
-    LOG_INF("writing soil calibration data form flash: [min: %d, max: %d].", data.soil_adc_min, data.soil_adc_max);
+    LOG_INF("writing soil calibration data form flash: [min: %d, max: %d].", data.soil_adc_soil_min, data.soil_adc_soil_max);
 	nvs_write(&fs, SOIL_DATA_ID, &data, sizeof(data));
 }
 
@@ -67,13 +67,13 @@ int flash_read_calibration_data(soil_calibration_t* data) {
     rc = nvs_read(&fs, SOIL_DATA_ID, data, sizeof(soil_calibration_t));
 	if (rc > 0) {
 		LOG_INF("Id: %d, data: %s\n", SOIL_DATA_ID, (char* )data);
-        LOG_INF("data readed: [min: %d, max: %d].", data->soil_adc_min, data->soil_adc_max);
+        LOG_INF("data readed: [min: %d, max: %d].", data->soil_adc_soil_min, data->soil_adc_soil_max);
         return ERROR_OK;
 	} else   {
-		data->soil_adc_max = 2000;
-		data->soil_adc_min = 1000;
+		data->soil_adc_soil_max = 2000;
+		data->soil_adc_soil_min = 1000;
 
-        LOG_WRN("data not founded in flash, writing defaults: [min: %d, max: %d].", data->soil_adc_max, data->soil_adc_min);
+        LOG_WRN("data not founded in flash, writing defaults: [min: %d, max: %d].", data->soil_adc_soil_max, data->soil_adc_soil_min);
 
 		flash_write_calibration_data(*data);
         

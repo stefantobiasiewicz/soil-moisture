@@ -4,8 +4,9 @@
 #include <zephyr/kernel.h>
 
 typedef struct {
-    uint16_t soil_adc_min;
-    uint16_t soil_adc_max;
+    uint16_t soil_adc_soil_min;
+    uint16_t soil_adc_soil_max;
+    //uint16_t soil_adc_water;
 } soil_calibration_t;
 
 // Inicjalizuje flash

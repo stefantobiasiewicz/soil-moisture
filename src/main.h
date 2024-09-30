@@ -1,6 +1,7 @@
-#ifndef ERROR_HH_S
-#define ERROR_HH_S
+#ifndef MAIN_HH_APP
+#define MAIN_HH_APP
 
+#include <zephyr/kernel.h>
 
 #define ERROR_OK 0
 
@@ -12,5 +13,10 @@
 #define ERROR_FLASH_INIT -10
 
 #define ERROR_NULL_POINTER -249
+
+typedef struct  {
+	uint16_t battery_value;
+	uint16_t soil_value;
+} measure_data_t;
 
 #endif

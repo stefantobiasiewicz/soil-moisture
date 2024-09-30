@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "ble.h": "c",
+        "flash.h": "c",
+        "hardware.h": "c"
+    },
+    "nrf-connect.debugging.bindings": {
+        "${workspaceFolder}/nrf52833-dev": "Launch nrf52833-dev"
+    }
+}

@@ -1,0 +1,12 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "nrf-connect",
+			"request": "launch",
+			"name": "Launch nrf52833-dev",
+			"config": "${workspaceFolder}/nrf52833-dev",
+			"runToEntryPoint": "main"
+		}
+	]
+}

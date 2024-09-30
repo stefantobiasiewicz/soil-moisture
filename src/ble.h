@@ -2,6 +2,7 @@
 #define BLE_HH_S
 
 #include <zephyr/kernel.h>
+#include "main.h"
 
 
 
@@ -60,7 +61,7 @@ int ble_advertise_connection_stop();
 /**
  * advertising soil and battery data
 */
-int ble_advertise_not_connection_data_start(uint16_t soil_value, uint16_t battery_value, uint16_t id);
+int ble_advertise_not_connection_data_start(measure_data_t data, uint16_t id);
 int ble_advertise_not_connection_data_stop();
 
 /**

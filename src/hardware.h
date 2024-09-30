@@ -14,6 +14,8 @@ struct hardware_callback_t
 
 int hardware_init(struct hardware_callback_t * callbacks_p);
 
+bool check_button_pressed();
+
 int hardware_read_adc_mv_moisture(void);
 int hardware_read_adc_mv_battery(void);
 

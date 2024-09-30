@@ -1,5 +1,5 @@
 #include "ble.h"
-#include "validation.h"
+#include "utils/validation.h"
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>
@@ -7,6 +7,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/logging/log.h>
+
 
 LOG_MODULE_REGISTER(ble, LOG_LEVEL_DBG);
 
@@ -357,10 +358,10 @@ int ble_advertise_connection_stop() {
 }
 
 
-int ble_advertise_not_connection_data_start(uint16_t soil_value, uint16_t battery_value, uint16_t id) {
-	LOG_INF("ble: setting battery value: [%d] and soil value: [%d] and unique_id: [%d].", battery_value, soil_value, id);
-	adv_mfg_data.ble_battery_value = battery_value;
-	adv_mfg_data.ble_soil_moisture_value = soil_value;
+int ble_advertise_not_connection_data_start(measure_data_t data, uint16_t id) {
+	LOG_INF("ble: setting battery value: [%d] and soil value: [%d] and unique_id: [%d].", data.battery_value, data.soil_value, id);
+	adv_mfg_data.ble_battery_value = data.battery_value;
+	adv_mfg_data.ble_soil_moisture_value = data.soil_value;
 	adv_mfg_data.unique_id = id;
 
 	if (k_sem_take(&avetising_sem, K_FOREVER) == 0) {
