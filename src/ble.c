@@ -1,5 +1,5 @@
 #include "ble.h"
-#include "utils/validation.h"
+
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>

@@ -11,7 +11,6 @@
 #include <zephyr/drivers/adc.h>
 
 #include <zephyr/sys/reboot.h>
-
 #include <zephyr/logging/log.h>
 
 #include "hardware.h"
@@ -23,28 +22,63 @@
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 
+/**
+ * utils
+ */
+void log_current_thread_info() {
+    k_tid_t thread_id = k_current_get();
+
+    LOG_INF("###########################################");
+    LOG_INF("Logging current thread information:");
+    LOG_INF("Thread ID: %p", thread_id);
+    LOG_INF("Thread Name: %s", k_thread_name_get(thread_id));
+    LOG_INF("###########################################");
+}
 
 
-void app_button_press();
+void error() {
+	LOG_ERR("Application occur error rebooting.");
+	k_sleep(K_MSEC(3000));
+	sys_reboot(0);
+}
+
+
+void app_left_button_press();
+void app_right_button_press();
 static struct hardware_callback_t hardware_callbacks = {
-	.app_button_press = app_button_press
+	.app_left_button_press = app_left_button_press,
+	.app_right_button_press = app_right_button_press
 };
 
 
 
-// #define ISR_THREAD_STACK_SIZE 2048
-// #define MY_PRIORITY 5
 
-// void isr_thread(void *, void *, void *);
+#define BUTTONS_STACK_SIZE 1024
+#define BUTTONS_THREAD_PRIORITY 2
 
-// K_THREAD_DEFINE(my_tid, ISR_THREAD_STACK_SIZE,
-//                 isr_thread, NULL, NULL, NULL,
-//                 MY_PRIORITY, 0, 0);
+void buttons_thread(void *, void *, void *);
+
+K_THREAD_STACK_DEFINE(buttons_stack_area, BUTTONS_STACK_SIZE);
+struct k_thread buttons_thread_data;
+k_tid_t buttons_tid;
+
+#define PERIODIC_STACK_SIZE 1024
+#define PERIODIC_THREAD_PRIORITY 2
+
+void periodic_thread(void *, void *, void *);
+
+K_THREAD_STACK_DEFINE(periodic_thread_area, PERIODIC_STACK_SIZE);
+struct k_thread periodic_thread_data;
+k_tid_t periodic_tid;
 
 
 int main(void)
 {	
-	LOG_INF("Soil meter application start.");
+    LOG_INF("###############################################");
+    LOG_INF("##                                           ##");
+    LOG_INF("##         Soil Meter Application Start      ##");
+    LOG_INF("##                                           ##");
+    LOG_INF("###############################################");
 
 	if (hardware_init(&hardware_callbacks) != ERROR_OK) {
 		error();
@@ -57,85 +91,142 @@ int main(void)
 	// if (ble_init(&application) != ERROR_OK) {
 	// 	error();
 	// }
+
+    buttons_tid = k_thread_create(&buttons_thread_data, buttons_stack_area,
+                                 K_THREAD_STACK_SIZEOF(buttons_stack_area),
+                                 buttons_thread,
+                                 NULL, NULL, NULL,
+                                 BUTTONS_THREAD_PRIORITY, 0, K_NO_WAIT);
+    k_thread_name_set(buttons_tid, "Buttons_thread");
     
+    periodic_tid = k_thread_create(&periodic_thread_data, periodic_thread_area,
+                                K_THREAD_STACK_SIZEOF(periodic_thread_area),
+                                periodic_thread,
+                                NULL, NULL, NULL,
+                                BUTTONS_THREAD_PRIORITY, 0, K_NO_WAIT);
+    k_thread_name_set(periodic_tid, "Periodic_thread");
 
     while(1) {
+        k_msleep(1000);
         k_cpu_idle();
     }
 }
 
 /**
- * ISR corelated functions
-*/
+ * Buttons thread handle all button related user input
+ */
+static volatile int left_button_click_count = 0;
+static volatile int right_button_click_count = 0;
 
-K_SEM_DEFINE(isr_sem, 0, 1);
-// K_MUTEX_DEFINE(isr_sem);
+void app_left_button_press() {
+    LOG_INF("app left button press");
 
+    left_button_click_count++;
+    k_thread_resume(buttons_tid);
+}
+void app_right_button_press() {
+    LOG_INF("app right button press");
 
-volatile int button_press_count = 0;
-void app_button_press() {
-    LOG_INF("app button press");
-    k_sem_give(&isr_sem);
-	button_press_count ++;
+    right_button_click_count++;
+    k_thread_resume(buttons_tid);
 }
 
-int button_code = 0;
+#define LONG_CLICK_THRESHOLD_MS 1000
 
-void isr_thread(void *, void *, void *) {
+
+void left_click(void) {
+    LOG_INF("Left button single click detected.");
+    hardware_blue_led_pulse_start();
+}
+
+void left_long_click(void) {
+    LOG_INF("Left button long click detected.");
+    hardware_led_off();
+}
+
+void right_click(void) {
+    LOG_INF("Right button single click detected.");
+}
+
+void right_long_click(void) {
+    LOG_INF("Right button long click detected.");
+}
+
+void buttons_thread(void *, void *, void *) {
+    log_current_thread_info();
+
     while (1)
     {
-		// button click detection
-		if(k_sem_take(&isr_sem, K_FOREVER) == 0) {
-			k_sleep(K_MSEC(300));
-			if(button_press_count > 1) {
-				// kliknęty kilka razy
-				button_code = 3;
-			}
-            else {
-                k_sleep(K_MSEC(20));
-                if (check_button_pressed()) { // juz nie trzymany
-                    button_code = 2;	// presss
+        LOG_INF("hello from button thread loop.");
+
+
+        // left/right: one click, double click, long click, 
+        // both click, both long press
+
+        k_usleep(1000);
+
+        if (check_left_button_pressed()) {
+            k_usleep(400);  
+
+            bool long_click = false;
+            uint64_t press_start_time = k_uptime_get();  
+
+            while (check_left_button_pressed()) {
+                if ((k_uptime_get() - press_start_time) >= LONG_CLICK_THRESHOLD_MS) {
+                    long_click = true; 
+                    break;
                 }
-                k_sleep(K_MSEC(20));
-                if (!check_button_pressed()) { // juz nie trzymany
-                    button_code = 1;	// jedno przytrzymanie
-                }
+                k_usleep(5000); 
             }
-			//use it
-			LOG_INF("button press code: %d", button_code);
-            button_press_count = 0;
+
+            if (long_click) {
+                left_long_click();
+            } else {
+                left_click();
+            }
         }
-		k_sleep(K_MSEC(30));
 
+        if (check_right_button_pressed()) {
+            k_usleep(400);  
 
-        // if(k_sem_take(&isr_sem, K_FOREVER) == 0) {
-        //     if(application_state == BUTTON_ACTION) {
-            
-        //         ble_advertise_connection_start();
-        //         blue_led_pulse_start();
+            bool long_click = false;
+            uint64_t press_start_time = k_uptime_get();  
 
-        //         k_sleep(K_SECONDS(10));
-        //         ble_advertise_connection_stop();
+            while (check_right_button_pressed()) {
+                if ((k_uptime_get() - press_start_time) >= LONG_CLICK_THRESHOLD_MS) {
+                    long_click = true; 
+                    break;
+                }
+                k_usleep(5000); 
+            }
 
-        //         if(application_state != CONECTED_TO_USER) {
-        //             application_state = NORMAL_WORK;
-        //             led_off();
-        //         }
-        //     }
-        // }
-        // k_sleep(K_MSEC(500));
+            if (long_click) {
+                right_long_click();
+            } else {
+                right_click();
+            }
+        }
+
+        k_msleep(200);
+        k_thread_suspend(buttons_tid);
     }
 }
 
+/**
+ * Periodic thread handle:
+ * soil measurements
+ * checking if data is ready to send (difference or sending timeout)
+ * displaying data
+ * sending data
+ * checking battery
+ */
+void periodic_thread(void *, void *, void *) {
+    log_current_thread_info();
 
-/*
+    while (1)
+    {
+        LOG_INF("Periodic measurments and data sharing.");
 
-
-main thread - inicjuje hardware 
-
-timer thread - thread started by timer and peridoic measurements
-
-buttion thread
-
-
-*/
+        k_msleep(10000);
+    }
+}

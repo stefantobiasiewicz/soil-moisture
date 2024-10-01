@@ -9,12 +9,14 @@
 
 struct hardware_callback_t
 {
-    app_button_press_t app_button_press;
+    app_button_press_t app_left_button_press;
+    app_button_press_t app_right_button_press;
 };
 
 int hardware_init(struct hardware_callback_t * callbacks_p);
 
-bool check_button_pressed();
+bool check_left_button_pressed();
+bool check_right_button_pressed();
 
 int hardware_read_adc_mv_moisture(void);
 int hardware_read_adc_mv_battery(void);

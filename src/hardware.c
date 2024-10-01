@@ -9,7 +9,7 @@
 
 #include <zephyr/logging/log.h>
 
-#include "utils/validation.h"
+#include "validation.h"
 
 LOG_MODULE_REGISTER(hardware, LOG_LEVEL_DBG);
 
@@ -70,7 +70,7 @@ void button_pressed(const struct device *dev, struct gpio_callback *cb,
 {
 	LOG_INF("Button pressed at %" PRIu32 "", k_cycle_get_32());
 
-    callbacks.app_button_press();
+    callbacks.app_left_button_press();
 }
 
 
@@ -146,14 +146,25 @@ int hardware_read_adc_mv_battery(void) {
     return read_mv_from_adc(&adc_vcc_chan);
 }
 
-bool check_button_pressed() {
-    LOG_INF("checking button state.");
+bool check_left_button_pressed() {
+    LOG_DBG("checking left button state.");
     bool result = false;
     if (gpio_pin_get_dt(&button) >= 1) {
         result = true;
     }
 
-    LOG_INF("button state: %d", result);
+    LOG_DBG("button state: %d", result);
+    return result;
+}
+
+bool check_right_button_pressed() {
+    LOG_DBG("checking left button state.");
+    bool result = false;
+    // if (gpio_pin_get_dt(&button) >= 1) {
+    //     result = true;
+    // }
+
+    // LOG_DBG("button state: %d", result);
     return result;
 }
 
@@ -164,12 +175,19 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
         return err;
     }
 
-    err = is_pointer_null(callbacks_p->app_button_press);
+    err = is_pointer_null(callbacks_p->app_left_button_press);
     if (err != ERROR_OK) {
         LOG_ERR("callbacks_p->app_button_press is NULL.");
         return err;
     }
-    callbacks.app_button_press = callbacks_p->app_button_press;
+    callbacks.app_left_button_press = callbacks_p->app_left_button_press;
+
+    err = is_pointer_null(callbacks_p->app_right_button_press);
+    if (err != ERROR_OK) {
+        LOG_ERR("callbacks_p->app_button_press is NULL.");
+        return err;
+    }
+    callbacks.app_right_button_press = callbacks_p->app_right_button_press;
 
 
 	if (!device_is_ready(generator.dev)) {
