@@ -136,7 +136,7 @@ void app_right_button_press() {
 
 void left_click(void) {
     LOG_INF("Left button single click detected.");
-    hardware_blue_led_pulse_start();
+    hardware_led_pulse_start(255, 0, 0, K_MSEC(2000));
 }
 
 void left_long_click(void) {

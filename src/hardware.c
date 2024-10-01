@@ -1,5 +1,6 @@
 #include "hardware.h"
 
+#include <math.h>
 #include <zephyr/drivers/pwm.h>
 
 #include <zephyr/device.h>
@@ -36,8 +37,6 @@ static const struct pwm_dt_spec pwm_led_b = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_b))
 static struct hardware_callback_t callbacks;
 
 
-void set_led_color(uint8_t red, uint8_t green, uint8_t blue);
-
 static void enable_sensor() {
     gpio_pin_set_dt(&sensor_power, 1);
 
@@ -50,20 +49,7 @@ static void disable_sensor() {
     pwm_set_dt(&generator, 5000 , 0); 
 }
 
-static struct k_timer pulse_timer;
-static int blue_intensity = 0;
-static int direction = 1; // Kierunek zmiany intensywności koloru (1 - wzrost, -1 - spadek)
-static uint32_t step_msec = 1;
-void pulse_blue_color_step() {
-    set_led_color(0, 0, blue_intensity);
 
-    blue_intensity += direction;
-
-    // Zmiana kierunku, gdy osiągniemy maksymalny lub minimalny poziom
-    if (blue_intensity <= 0 || blue_intensity >= 255) {
-        direction = -direction;
-    }
-}
 
 void button_pressed(const struct device *dev, struct gpio_callback *cb,
 		    uint32_t pins)
@@ -74,7 +60,44 @@ void button_pressed(const struct device *dev, struct gpio_callback *cb,
 }
 
 
-void set_led_color(uint8_t red, uint8_t green, uint8_t blue) {
+
+
+static struct k_timer pulse_timer;
+static float time_step = 0;        // Krok czasu (zmienna czasowa)
+static float pulse_speed = 0.05;   // Prędkość pulsowania
+static uint8_t pulse_red = 0;      // Wartość komponentu czerwonego (ustawiana przez użytkownika)
+static uint8_t pulse_green = 0;    // Wartość komponentu zielonego (ustawiana przez użytkownika)
+static uint8_t pulse_blue = 0;     // Wartość komponentu niebieskiego (ustawiana przez użytkownika)
+
+#define M_PI		3.14159265358979323846
+
+// Timer obsługujący pulsowanie kolorem LED
+static void led_pulse_step() {
+    // Obliczamy współczynnik jasności na podstawie funkcji sinusoidalnej
+    float brightness_factor = (sin(time_step) + 1) / 2; // Skaluje sinus od 0 do 1
+
+    // Zmienne końcowe dla koloru po modulacji jasności
+    uint8_t lr = (uint8_t)(pulse_red * brightness_factor);
+    uint8_t lg = (uint8_t)(pulse_green * brightness_factor);
+    uint8_t lb = (uint8_t)(pulse_blue * brightness_factor);
+
+    // Ustawiamy kolor diody z modulowaną jasnością
+    hardware_set_led_color(lr, lg, lb);
+
+    // Aktualizujemy krok czasu, aby sinusoidalna funkcja się zmieniała
+    time_step += pulse_speed;
+
+    // Gdy sinus się powtórzy (po 2π), resetujemy krok czasu
+    if (time_step > 2 * M_PI) {
+        time_step = 0;
+    }
+}
+
+static void led_timer_end() {
+    hardware_set_led_color(0,0,0);
+}
+
+void hardware_set_led_color(uint8_t red, uint8_t green, uint8_t blue) {
     pwm_set_pulse_dt(&pwm_led_r, PWM_USEC(red));
     pwm_set_pulse_dt(&pwm_led_g, PWM_USEC(green));
     pwm_set_pulse_dt(&pwm_led_b, PWM_USEC(blue));
@@ -83,17 +106,18 @@ void set_led_color(uint8_t red, uint8_t green, uint8_t blue) {
 
 void hardware_led_off(void) {
     k_timer_stop(&pulse_timer);
-    set_led_color(0,0,0);
+    hardware_set_led_color(0,0,0);
 }
 
-void hardware_blue_led_pulse_start(void) {
-    k_timer_start(&pulse_timer, K_MSEC(0), K_MSEC(step_msec));
-}
+/**
+ * timeout - K_MSEC(0)
+ */
+void hardware_led_pulse_start(uint8_t red, uint8_t green, uint8_t blue, k_timeout_t timeout) {
+    pulse_red = red;
+    pulse_green = green;
+    pulse_blue = blue;
 
-void hardware_purple_led(void) {
-    hardware_led_off();
-
-    set_led_color(255,0,255);
+    k_timer_start(&pulse_timer,  K_MSEC(1), K_MSEC(1));
 }
 
 
@@ -297,7 +321,7 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
 	gpio_add_callback(button.port, &button_cb_data);
 	LOG_INF("Set up button at %s pin %d", button.port->name, button.pin);
 
-    k_timer_init(&pulse_timer, pulse_blue_color_step, NULL);
+    k_timer_init(&pulse_timer, led_pulse_step, led_timer_end);
     hardware_led_off();
 
     return err;
