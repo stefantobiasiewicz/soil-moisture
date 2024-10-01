@@ -16,10 +16,17 @@ LOG_MODULE_REGISTER(hardware, LOG_LEVEL_DBG);
 
 #define ZEPHYR_USER_NODE DT_PATH(zephyr_user)
 
-static const struct adc_dt_spec adc_soil_chan = ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USER_NODE, 0);
-static const struct adc_dt_spec adc_vcc_chan = ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USER_NODE, 1);
+static const struct adc_dt_spec adc_battery_chan = ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USER_NODE, 0);
+static const struct adc_dt_spec adc_soil_chan = ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USER_NODE, 1);
+static const struct adc_dt_spec adc_temp_chan = ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USER_NODE, 2);
+static const struct adc_dt_spec adc_vcc_chan = ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USER_NODE, 3);
 
-const struct gpio_dt_spec sensor_power = GPIO_DT_SPEC_GET(ZEPHYR_USER_NODE, signal_gpios);
+
+const struct gpio_dt_spec power_high = GPIO_DT_SPEC_GET(DT_NODELABEL(power_high_out), gpios);
+const struct gpio_dt_spec power_internal = GPIO_DT_SPEC_GET(DT_NODELABEL(power_internal_out), gpios);
+
+const struct gpio_dt_spec eink_rst = GPIO_DT_SPEC_GET(DT_NODELABEL(eink_rst_out), gpios);
+const struct gpio_dt_spec eink_busy = GPIO_DT_SPEC_GET(DT_NODELABEL(eink_busy_out), gpios);
 
 const struct pwm_dt_spec generator = PWM_DT_SPEC_GET_BY_NAME(ZEPHYR_USER_NODE, generator);
 
@@ -27,8 +34,11 @@ const struct pwm_dt_spec generator = PWM_DT_SPEC_GET_BY_NAME(ZEPHYR_USER_NODE, g
 /**
  * UX
 */
-static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET_OR(DT_ALIAS(button), gpios, {0});
-static struct gpio_callback button_cb_data;
+static const struct gpio_dt_spec button_left = GPIO_DT_SPEC_GET_OR(DT_ALIAS(button_left), gpios, {0});
+static struct gpio_callback button_left_cb_data;
+
+static const struct gpio_dt_spec button_right = GPIO_DT_SPEC_GET_OR(DT_ALIAS(button_right), gpios, {0});
+static struct gpio_callback button_right_cb_data;
 
 static const struct pwm_dt_spec pwm_led_r = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_r));
 static const struct pwm_dt_spec pwm_led_g = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_g));
@@ -37,57 +47,56 @@ static const struct pwm_dt_spec pwm_led_b = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_b))
 static struct hardware_callback_t callbacks;
 
 
-static void enable_sensor() {
-    gpio_pin_set_dt(&sensor_power, 1);
-
+void hardware_genrator_on() {
     pwm_set_dt(&generator, 5000 , 2500); 
 }
 
-static void disable_sensor() {
-    gpio_pin_set_dt(&sensor_power, 0);
-
+void hardware_genrator_off() {
     pwm_set_dt(&generator, 5000 , 0); 
 }
 
-
-
-void button_pressed(const struct device *dev, struct gpio_callback *cb,
-		    uint32_t pins)
-{
-	LOG_INF("Button pressed at %" PRIu32 "", k_cycle_get_32());
-
-    callbacks.app_left_button_press();
+void hardware_power_up() {
+    gpio_pin_set_dt(&power_high, 1);
 }
 
+void hardware_power_down() {
+    gpio_pin_set_dt(&power_high, 0);
+}
+
+void hardware_power_internal_up() {
+    gpio_pin_set_dt(&power_internal, 1);
+}
+
+void hardware_power_internal_down() {
+    gpio_pin_set_dt(&power_internal, 0);
+}
+
+/**
+ * todo eink pins
+ */
 
 
 
 static struct k_timer pulse_timer;
-static float time_step = 0;        // Krok czasu (zmienna czasowa)
-static float pulse_speed = 0.05;   // Prędkość pulsowania
-static uint8_t pulse_red = 0;      // Wartość komponentu czerwonego (ustawiana przez użytkownika)
-static uint8_t pulse_green = 0;    // Wartość komponentu zielonego (ustawiana przez użytkownika)
-static uint8_t pulse_blue = 0;     // Wartość komponentu niebieskiego (ustawiana przez użytkownika)
+static float time_step = 0;      
+static float pulse_speed = 0.05; 
+static uint8_t pulse_red = 0;    
+static uint8_t pulse_green = 0;  
+static uint8_t pulse_blue = 0;   
 
 #define M_PI		3.14159265358979323846
 
-// Timer obsługujący pulsowanie kolorem LED
 static void led_pulse_step() {
-    // Obliczamy współczynnik jasności na podstawie funkcji sinusoidalnej
-    float brightness_factor = (sin(time_step) + 1) / 2; // Skaluje sinus od 0 do 1
+    float brightness_factor = (sin(time_step) + 1) / 2; 
 
-    // Zmienne końcowe dla koloru po modulacji jasności
     uint8_t lr = (uint8_t)(pulse_red * brightness_factor);
     uint8_t lg = (uint8_t)(pulse_green * brightness_factor);
     uint8_t lb = (uint8_t)(pulse_blue * brightness_factor);
 
-    // Ustawiamy kolor diody z modulowaną jasnością
     hardware_set_led_color(lr, lg, lb);
 
-    // Aktualizujemy krok czasu, aby sinusoidalna funkcja się zmieniała
     time_step += pulse_speed;
 
-    // Gdy sinus się powtórzy (po 2π), resetujemy krok czasu
     if (time_step > 2 * M_PI) {
         time_step = 0;
     }
@@ -155,25 +164,26 @@ static int read_mv_from_adc(const struct adc_dt_spec * adc) {
     return val_mv;
 }
 
-int hardware_read_adc_mv_moisture(void) {
-    enable_sensor();
-    k_sleep(K_MSEC(200));
-    
-    int result = read_mv_from_adc(&adc_soil_chan);
-
-    disable_sensor();
-
-    return result;
+int hardware_read_adc_mv_battery(void) {
+    return read_mv_from_adc(&adc_battery_chan);
 }
 
-int hardware_read_adc_mv_battery(void) {
+int hardware_read_adc_mv_moisture(void) {    
+    return read_mv_from_adc(&adc_soil_chan);
+}
+
+int hardware_read_adc_mv_tempNTC(void) {
+    return read_mv_from_adc(&adc_temp_chan);
+}
+
+int hardware_read_adc_mv_vcc(void) {
     return read_mv_from_adc(&adc_vcc_chan);
 }
 
 bool check_left_button_pressed() {
     LOG_DBG("checking left button state.");
     bool result = false;
-    if (gpio_pin_get_dt(&button) >= 1) {
+    if (gpio_pin_get_dt(&button_left) >= 1) {
         result = true;
     }
 
@@ -191,6 +201,28 @@ bool check_right_button_pressed() {
     // LOG_DBG("button state: %d", result);
     return result;
 }
+
+
+
+
+static void left_button_pressed(const struct device *dev, struct gpio_callback *cb,
+		    uint32_t pins)
+{
+	LOG_INF("Button left pressed at %" PRIu32 "", k_cycle_get_32());
+
+    callbacks.app_left_button_press();
+}
+
+
+static void right_button_pressed(const struct device *dev, struct gpio_callback *cb,
+		    uint32_t pins)
+{
+	LOG_INF("Button right pressed at %" PRIu32 "", k_cycle_get_32());
+
+    callbacks.app_right_button_press();
+}
+
+
 
 int hardware_init(struct hardware_callback_t * callbacks_p) {
     int err = is_pointer_null(callbacks_p);
@@ -219,24 +251,67 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
 		return -1;
 	}
 
-	if (!device_is_ready(sensor_power.port)) {
-		LOG_ERR("Gpio for powering soil sensor device not ready");
+	if (!device_is_ready(power_high.port)) {
+		LOG_ERR("Gpio for poerw high device not ready");
 		return -1;
 	}
 
-	err = gpio_pin_configure_dt(&sensor_power, GPIO_OUTPUT);
+	err = gpio_pin_configure_dt(&power_high, GPIO_OUTPUT);
 	if (err < 0) {
-		LOG_ERR("Could not setup gpio for powering soil sensor (%d)", err);
+		LOG_ERR("Could not setup gpio for poerw high (%d)", err);
 		return -1;
 	}
 
-    disable_sensor();
+	if (!device_is_ready(power_internal.port)) {
+		LOG_ERR("Gpio for power internal device not ready");
+		return -1;
+	}
+
+	err = gpio_pin_configure_dt(&power_internal, GPIO_OUTPUT);
+	if (err < 0) {
+		LOG_ERR("Could not setup gpio for power internal (%d)", err);
+		return -1;
+	}
+
+	if (!device_is_ready(eink_rst.port)) {
+		LOG_ERR("Gpio for eink rst internal device not ready");
+		return -1;
+	}
+
+	err = gpio_pin_configure_dt(&eink_rst, GPIO_OUTPUT);
+	if (err < 0) {
+		LOG_ERR("Could not setup gpio for eink rst (%d)", err);
+		return -1;
+	}
+
+    if (!device_is_ready(eink_busy.port)) {
+		LOG_ERR("Gpio for eink busy internal device not ready");
+		return -1;
+	}
+
+	err = gpio_pin_configure_dt(&eink_busy, GPIO_OUTPUT);
+	if (err < 0) {
+		LOG_ERR("Could not setup gpio for eink busy (%d)", err);
+		return -1;
+	}
+
+    hardware_power_down();
     
     /**
      * 
      * adc channels config
      * 
     */
+   	if (!device_is_ready(adc_battery_chan.dev)) {
+		LOG_ERR("ADC controller for battery device not ready");
+		return -1;
+	}
+
+	err = adc_channel_setup_dt(&adc_battery_chan);
+	if (err < 0) {
+		LOG_ERR("Could not setup adc battery channel (%d)", err);
+		return -1;
+	}
 
 	if (!device_is_ready(adc_soil_chan.dev)) {
 		LOG_ERR("ADC controller for soil device not ready");
@@ -246,6 +321,17 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
 	err = adc_channel_setup_dt(&adc_soil_chan);
 	if (err < 0) {
 		LOG_ERR("Could not setup adc soil channel (%d)", err);
+		return -1;
+	}
+
+	if (!device_is_ready(adc_temp_chan.dev)) {
+		LOG_ERR("ADC controller for temperature NTC device not ready");
+		return -1;
+	}
+
+	err = adc_channel_setup_dt(&adc_temp_chan);
+	if (err < 0) {
+		LOG_ERR("Could not setup adc temperature NTC channel (%d)", err);
 		return -1;
 	}
 
@@ -296,31 +382,60 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
      * Button init
      * 
     */
-   if (!device_is_ready(button.port)) {
+   if (!device_is_ready(button_left.port)) {
 		LOG_ERR("Error: button device %s is not ready",
-		       button.port->name);
+		       button_left.port->name);
 		return -1;
 	}
 
-	err = gpio_pin_configure_dt(&button, GPIO_INPUT);
+	err = gpio_pin_configure_dt(&button_left, GPIO_INPUT);
 	if (err != 0) {
 		LOG_ERR("Error %d: failed to configure %s pin %d",
-		       err, button.port->name, button.pin);
+		       err, button_left.port->name, button_left.pin);
 		return -1;
 	}
 
-	err = gpio_pin_interrupt_configure_dt(&button,
+	err = gpio_pin_interrupt_configure_dt(&button_left,
 					      GPIO_INT_EDGE_TO_ACTIVE);
 	if (err != 0) {
 		LOG_ERR("Error %d: failed to configure interrupt on %s pin %d",
-			err, button.port->name, button.pin);
+			err, button_left.port->name, button_left.pin);
 		return -1;
 	}
 
-	gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin));
-	gpio_add_callback(button.port, &button_cb_data);
-	LOG_INF("Set up button at %s pin %d", button.port->name, button.pin);
+	gpio_init_callback(&button_left_cb_data, left_button_pressed, BIT(button_left.pin));
+	gpio_add_callback(button_left.port, &button_left_cb_data);
+	LOG_INF("Set up button at %s pin %d", button_left.port->name, button_left.pin);
 
+   if (!device_is_ready(button_right.port)) {
+		LOG_ERR("Error: button device %s is not ready",
+		       button_right.port->name);
+		return -1;
+	}
+
+	err = gpio_pin_configure_dt(&button_right, GPIO_INPUT);
+	if (err != 0) {
+		LOG_ERR("Error %d: failed to configure %s pin %d",
+		       err, button_right.port->name, button_right.pin);
+		return -1;
+	}
+
+	err = gpio_pin_interrupt_configure_dt(&button_right,
+					      GPIO_INT_EDGE_TO_ACTIVE);
+	if (err != 0) {
+		LOG_ERR("Error %d: failed to configure interrupt on %s pin %d",
+			err, button_right.port->name, button_right.pin);
+		return -1;
+	}
+
+	gpio_init_callback(&button_right_cb_data, right_button_pressed, BIT(button_right.pin));
+	gpio_add_callback(button_right.port, &button_right_cb_data);
+	LOG_INF("Set up button at %s pin %d", button_right.port->name, button_right.pin);
+
+
+    /**
+     * timer init
+     */
     k_timer_init(&pulse_timer, led_pulse_step, led_timer_end);
     hardware_led_off();
 
