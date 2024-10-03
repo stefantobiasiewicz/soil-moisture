@@ -1,16 +1,12 @@
 #include "hardware.h"
 
 #include <math.h>
-#include <zephyr/drivers/pwm.h>
 
-#include <zephyr/device.h>
-#include <zephyr/devicetree.h>
-#include <zephyr/drivers/adc.h>
-#include <zephyr/drivers/gpio.h>
+
 
 #include <zephyr/logging/log.h>
 
-#include "validation.h"
+#include "../validation.h"
 
 LOG_MODULE_REGISTER(hardware, LOG_LEVEL_DBG);
 
@@ -30,7 +26,6 @@ const struct gpio_dt_spec eink_busy = GPIO_DT_SPEC_GET(DT_NODELABEL(eink_busy_ou
 
 const struct pwm_dt_spec generator = PWM_DT_SPEC_GET_BY_NAME(ZEPHYR_USER_NODE, generator);
 
-
 /**
  * UX
 */
@@ -40,11 +35,17 @@ static struct gpio_callback button_left_cb_data;
 static const struct gpio_dt_spec button_right = GPIO_DT_SPEC_GET_OR(DT_ALIAS(button_right), gpios, {0});
 static struct gpio_callback button_right_cb_data;
 
+static struct hardware_callback_t callbacks;
+
+
 static const struct pwm_dt_spec pwm_led_r = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_r));
 static const struct pwm_dt_spec pwm_led_g = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_g));
 static const struct pwm_dt_spec pwm_led_b = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_b));
 
-static struct hardware_callback_t callbacks;
+
+const struct i2c_dt_spec eink_1in9_com = I2C_DT_SPEC_GET(DT_NODELABEL(eink_1in9_com_i2c));
+const struct i2c_dt_spec eink_1in9_data = I2C_DT_SPEC_GET(DT_NODELABEL(eink_1in9_data_i2c));
+
 
 
 void hardware_genrator_on() {
@@ -431,6 +432,20 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
 	gpio_init_callback(&button_right_cb_data, right_button_pressed, BIT(button_right.pin));
 	gpio_add_callback(button_right.port, &button_right_cb_data);
 	LOG_INF("Set up button at %s pin %d", button_right.port->name, button_right.pin);
+
+
+	/**
+	 * i2c uC decvices init
+	 */
+	if (!device_is_ready(eink_1in9_com.bus)) {
+		LOG_ERR("I2C bus %s is not ready!\n\r",eink_1in9_com.bus->name);
+		return -1;
+	}
+
+	if (!device_is_ready(eink_1in9_data.bus)) {
+		LOG_ERR("I2C bus %s is not ready!\n\r",eink_1in9_data.bus->name);
+		return -1;
+	}
 
 
     /**

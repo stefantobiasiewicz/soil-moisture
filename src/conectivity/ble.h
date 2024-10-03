@@ -2,7 +2,7 @@
 #define BLE_HH_S
 
 #include <zephyr/kernel.h>
-#include "main.h"
+#include "../main.h"
 
 
 

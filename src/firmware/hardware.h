@@ -2,9 +2,18 @@
 #define HARDWARE_HH
 
 #include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
 
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/pwm.h>
+#include <zephyr/drivers/adc.h>
+#include <zephyr/drivers/gpio.h>
 
- typedef void (*app_button_press_t)();
+extern const struct i2c_dt_spec eink_1in9_com;
+extern const struct i2c_dt_spec eink_1in9_data;
+
+typedef void (*app_button_press_t)();
 
 
 struct hardware_callback_t

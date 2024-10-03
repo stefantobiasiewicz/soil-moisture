@@ -13,9 +13,9 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log.h>
 
-#include "hardware.h"
-#include "flash.h"
-#include "ble.h"
+#include "firmware/hardware.h"
+#include "firmware/flash.h"
+#include "conectivity/ble.h"
 #include <stdlib.h>
 
 

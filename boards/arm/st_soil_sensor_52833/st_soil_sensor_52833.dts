@@ -9,7 +9,7 @@
 	compatible = "st-soil-sensor-52833";
 
 	zephyr,user{
-		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>;
+		io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 4>;
         pwms = <&pwm0 0 1000 PWM_POLARITY_NORMAL>;
         pwm-names = "generator";
 	};
@@ -96,6 +96,23 @@
 
 &gpio1 {
 	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-1 = <&i2c0_sleep>;
+	pinctrl-names = "default", "sleep";
+	eink_1in9_com_i2c: eink@3C{
+        compatible = "i2c-device";
+        reg = < 0x3C >;
+        label = "eink_1in9_com";
+    };
+	eink_1in9_data_i2c: eink@3D{
+        compatible = "i2c-device";
+        reg = < 0x3D >;
+        label = "eink_1in9_data";
+    };
 };
 
 
@@ -205,6 +222,19 @@
             bias-pull-up;
 			low-power-enable;
 	    };
+	};
+
+	i2c0_default: i2c0_default {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SDA, 1, 10)>, <NRF_PSEL(TWIM_SDA, 1, 11)>;
+		};
+	};
+
+	i2c0_sleep: i2c0_sleep {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SDA, 1, 10)>, <NRF_PSEL(TWIM_SDA, 1, 11)>;
+			low-power-enable;
+		};
 	};
 };
 

@@ -3,7 +3,7 @@
 #include <zephyr/fs/nvs.h>
 
 #include "flash.h"
-#include "main.h"
+#include "../main.h"
 
 #include <zephyr/logging/log.h>
 
