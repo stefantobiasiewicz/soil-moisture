@@ -7,6 +7,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/logging/log.h>
+#include "../validation.h"
 
 
 LOG_MODULE_REGISTER(ble, LOG_LEVEL_DBG);

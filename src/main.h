@@ -19,4 +19,15 @@ typedef struct  {
 	uint16_t soil_value;
 } measure_data_t;
 
+typedef struct  {
+	uint16_t dry_value;
+	uint16_t wet_value;
+} soil_moisture_calib_data_t;
+
+typedef struct {
+	bool ble_enable;
+	bool display_enable;
+} deivce_config_t;
+
+
 #endif

@@ -16,13 +16,18 @@
 #include "conectivity/ble.h"
 
 #include "display.h"
-#include "ntc.h"
+#include "logic_control.h"
 
 #include <stdlib.h>
 
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
+
+soil_moisture_calib_data_t soil_moisture_calib_data = {
+    .dry_value = 1000,
+    .wet_value = 2000,
+};
 
 deivce_config_t device_config = {
     .ble_enable = false,
@@ -59,6 +64,24 @@ static struct hardware_callback_t hardware_callbacks = {
 };
 
 
+void pin_reset_set(bool set) {
+    if (set) {
+        hardware_eink_rst_up();   
+    } else {
+        hardware_eink_rst_down();
+    } 
+}
+
+
+bool pin_busy_read() {
+    return hardware_eink_busy_read() == 1 ? true : false;
+}
+
+eink_1in9_pins_t eink_1in9_pins = {
+    .pin_reset_set = pin_reset_set, 
+    .pin_busy_read = pin_busy_read
+};
+
 
 
 #define BUTTONS_STACK_SIZE 1024
@@ -78,6 +101,8 @@ void periodic_thread(void *, void *, void *);
 K_THREAD_STACK_DEFINE(periodic_thread_area, PERIODIC_STACK_SIZE);
 struct k_thread periodic_thread_data;
 k_tid_t periodic_tid;
+
+k_tid_t main_tid;
 
 
 int main(void)
@@ -100,6 +125,10 @@ int main(void)
 	// 	error();
 	// }
 
+    if(device_config.display_enable) {
+        display_init(&eink_1in9_pins);
+    }
+
     buttons_tid = k_thread_create(&buttons_thread_data, buttons_stack_area,
                                  K_THREAD_STACK_SIZEOF(buttons_stack_area),
                                  buttons_thread,
@@ -114,9 +143,14 @@ int main(void)
                                 BUTTONS_THREAD_PRIORITY, 0, K_NO_WAIT);
     k_thread_name_set(periodic_tid, "Periodic_thread");
 
+
+    main_tid = k_current_get();
+    k_thread_name_set(main_tid, "Main_thread");
+
     while(1) {
-        k_msleep(1000);
-        k_cpu_idle();
+        k_msleep(10);
+        
+        k_thread_suspend(main_tid);
     }
 }
 
@@ -154,6 +188,10 @@ void left_long_click(void) {
 
 void right_click(void) {
     LOG_INF("Right button single click detected.");
+
+    //put to queue
+
+    k_thread_resume(main_tid);   
 }
 
 void right_long_click(void) {
@@ -249,39 +287,46 @@ void periodic_thread(void *, void *, void *) {
         hardware_power_up();
         k_msleep(20);
 
-        int battery_mv = hardware_read_adc_mv_battery();
+        int battery_mv_raw = hardware_read_adc_mv_battery();
+        float battery = vbat_calculate_battery(battery_mv_raw);
         k_msleep(20);
 
-        int temperature_mv = hardware_read_adc_mv_tempNTC();
-        float ground_temperature = calcualte_temperatrue(temperature_mv * 1000);
+        int temperature_mv_raw = hardware_read_adc_mv_tempNTC();
+        float ground_temperature = ntc_calcualte_temperatrue(temperature_mv_raw * 1000);
         k_msleep(20);
 
         hardware_genrator_on();
         k_msleep(100);
-        int soil_moisture_mv = hardware_read_adc_mv_moisture();
+        int soil_moisture_mv_raw = hardware_read_adc_mv_moisture();
         hardware_genrator_off();
-        float soil_moisture = soil_moisture_mv/100;//calcualte_soil_moisture(calib_data);
+        float soil_moisture = capacitive_sensor_calculate_moisture(soil_moisture_mv_raw, soil_moisture_calib_data);
         k_msleep(20);
 
+        bool notify = check_parameters_changes(soil_moisture, ground_temperature, battery, k_uptime_get());
 
-        if(device_config.display_enable) {
-            hardware_power_internal_up();
+        if(notify) {
+            if(device_config.display_enable) {
+                if (true) {
+                    hardware_power_internal_up();
 
-            display_power_on();
-            display_values(ground_temperature, soil_moisture);
+                    display_power_on();
+                    display_values(ground_temperature, soil_moisture);
 
-            hardware_power_internal_down();
-        }
+                    k_msleep(100);
+                    hardware_power_internal_down();
+                }
+            }
 
-        if(device_config.ble_enable) {
-            // if(value_schages)
-            // ble_advertise_not_connection_data_start(...);
-            // k_msleep(10000);
-            // ble_advertise_not_connection_data_stop();    
+            if(device_config.ble_enable) {
+                // if(value_schages)
+                // ble_advertise_not_connection_data_start(...);
+                // k_msleep(10000);
+                // ble_advertise_not_connection_data_stop();    
+            }
         }
 
         hardware_power_down();
 
-        k_msleep(10000);
+        k_msleep(get_next_wakeup_time_ms());
     }
 }

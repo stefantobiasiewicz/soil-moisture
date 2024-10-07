@@ -75,6 +75,17 @@ void hardware_power_internal_down() {
 /**
  * todo eink pins
  */
+void hardware_eink_rst_up() {
+    gpio_pin_set_dt(&eink_rst, 1);
+}
+
+void hardware_eink_rst_down() {
+    gpio_pin_set_dt(&eink_rst, 0);
+}
+
+int hardware_eink_busy_read() {
+    return gpio_pin_get_dt(&eink_busy);
+}
 
 
 

@@ -10,7 +10,7 @@ target_sources(app PRIVATE src/main.c
                 src/firmware/flash.c 
                 src/validation.c
                 src/display.c
-                src/ntc.c
+                src/logic_control.c
             )
 
 if(CONFIG_BT)

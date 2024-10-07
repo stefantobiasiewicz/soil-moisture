@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdio.h>
+#include "logic_control.h"
 
 /*
    Voltage divider with an NTC resistor:
@@ -41,6 +42,10 @@
 #define T_0 273.15    // 0 degrees Celsius in Kelvin
 #define PRECISION 3   // Precision for floating-point calculations
 
+
+/**
+ * base on https://www.giangrandi.org/electronics/ntc/ntc.shtml
+ */
 static int calculate_temperature_from_U(float U_adc, float beta, float R_25, float U_ref, float R_f, float* temperature, float* R_ntc, float* I_ntc, float* P_ntc) {
     if (U_ref <= 0) {
         printf("Enter a valid reference voltage U_ref.\n");
@@ -106,9 +111,9 @@ if (calculate_temperature_from_U(U_adc, beta, R_25, U_ref, R_f, &temperature, &R
 
 
 /**
- * return value i celcius
+ * @return value i celcius
  */
-float calcualte_temperatrue(float adc_mv) {
+float ntc_calcualte_temperatrue(float adc_mv) {
     const float beta = 3950; 
     const float R_25 = 10000;
     const float U_ref = 3.3; 
@@ -121,3 +126,37 @@ float calcualte_temperatrue(float adc_mv) {
     return temperature;
 }
 
+
+
+/**
+ * @return soil moisture in percetage
+ */
+float capacitive_sensor_calculate_moisture(uint16_t raw_value, soil_moisture_calib_data_t calibration_data) {
+
+    return -1.;
+}
+
+
+/**
+ * @return battery in percetage
+ */
+float vbat_calculate_battery(uint16_t raw_value) {
+
+    return -1.;
+}
+
+/**
+ * @return if device should update display/send data
+ */
+bool check_parameters_changes(float soil_moisture, float ground_temperature, float battery, uint64_t up_time_ms) {
+
+    return true;
+}
+
+
+/**
+ * @return next wake up time for checking parameters base on changes detected by @see check_parameters_changes(...) function
+ */
+int get_next_wakeup_time_ms() {
+    return 10000;
+}
