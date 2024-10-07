@@ -22,7 +22,7 @@ const struct gpio_dt_spec power_high = GPIO_DT_SPEC_GET(DT_NODELABEL(power_high_
 const struct gpio_dt_spec power_internal = GPIO_DT_SPEC_GET(DT_NODELABEL(power_internal_out), gpios);
 
 const struct gpio_dt_spec eink_rst = GPIO_DT_SPEC_GET(DT_NODELABEL(eink_rst_out), gpios);
-const struct gpio_dt_spec eink_busy = GPIO_DT_SPEC_GET(DT_NODELABEL(eink_busy_out), gpios);
+const struct gpio_dt_spec eink_busy = GPIO_DT_SPEC_GET(DT_NODELABEL(eink_busy_in), gpios);
 
 const struct pwm_dt_spec generator = PWM_DT_SPEC_GET_BY_NAME(ZEPHYR_USER_NODE, generator);
 
@@ -132,7 +132,7 @@ void hardware_led_pulse_start(uint8_t red, uint8_t green, uint8_t blue, k_timeou
 
 
 static int read_mv_from_adc(const struct adc_dt_spec * adc) {
-    LOG_INF("hardware: reading adc form chanel with id: [%d].", adc->channel_id);
+    LOG_DBG("hardware: reading adc form chanel with id: [%d].", adc->channel_id);
 
     int err = 0;
 
@@ -290,7 +290,7 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
 		return -1;
 	}
 
-	err = gpio_pin_configure_dt(&eink_busy, GPIO_OUTPUT);
+	err = gpio_pin_configure_dt(&eink_busy, GPIO_INPUT);
 	if (err < 0) {
 		LOG_ERR("Could not setup gpio for eink busy (%d)", err);
 		return -1;

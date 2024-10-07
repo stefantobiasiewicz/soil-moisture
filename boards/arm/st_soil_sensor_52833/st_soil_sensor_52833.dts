@@ -57,11 +57,7 @@
 		eink_rst_out: eink_rst {
 			 gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
 			 label = "eink reset";
-		};   	 				 	 		        
-		eink_busy_out: eink_busy {
-			 gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
-			 label = "eink busy";
-		};   	 		
+		};   	 				 	 		         		
 	 };  
 
 	buttons {
@@ -74,6 +70,10 @@
 			gpios = <&gpio0 9 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
 			label = "button right";
 		};
+		eink_busy_in: eink_busy {
+			gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+			label = "eink busy";
+	   };   	
 	};
 
 	/* These aliases are provided for compatibility with samples */

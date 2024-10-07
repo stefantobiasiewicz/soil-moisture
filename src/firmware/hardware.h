@@ -27,14 +27,21 @@ int hardware_init(struct hardware_callback_t * callbacks_p);
 bool check_left_button_pressed();
 bool check_right_button_pressed();
 
-void hardware_power_up();
-void hardware_power_down();
 
 /**
  * soil generator
  */
 void hardware_genrator_on();
 void hardware_genrator_off();
+
+/**
+ * powering internal 3v3 
+ */
+void hardware_power_up();
+void hardware_power_down();
+/**
+ * powering 3v3-internal bus use for display and extensions
+ */
 void hardware_power_internal_up();
 void hardware_power_internal_down();
 

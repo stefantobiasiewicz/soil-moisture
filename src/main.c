@@ -5,21 +5,29 @@
  */
 
 #include <zephyr/kernel.h>
-
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/adc.h>
-
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log.h>
 
 #include "firmware/hardware.h"
 #include "firmware/flash.h"
 #include "conectivity/ble.h"
+
+#include "display.h"
+#include "ntc.h"
+
 #include <stdlib.h>
 
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
+
+
+deivce_config_t device_config = {
+    .ble_enable = false,
+    .display_enable = false,
+};
 
 
 /**
@@ -226,6 +234,53 @@ void periodic_thread(void *, void *, void *) {
     while (1)
     {
         LOG_INF("Periodic measurments and data sharing.");
+
+        /*
+            power up
+            battery
+            temperature 
+            soil 
+
+            check if need to update display
+                display
+            check if need to publish by ble
+                publish
+        */
+        hardware_power_up();
+        k_msleep(20);
+
+        int battery_mv = hardware_read_adc_mv_battery();
+        k_msleep(20);
+
+        int temperature_mv = hardware_read_adc_mv_tempNTC();
+        float ground_temperature = calcualte_temperatrue(temperature_mv * 1000);
+        k_msleep(20);
+
+        hardware_genrator_on();
+        k_msleep(100);
+        int soil_moisture_mv = hardware_read_adc_mv_moisture();
+        hardware_genrator_off();
+        float soil_moisture = soil_moisture_mv/100;//calcualte_soil_moisture(calib_data);
+        k_msleep(20);
+
+
+        if(device_config.display_enable) {
+            hardware_power_internal_up();
+
+            display_power_on();
+            display_values(ground_temperature, soil_moisture);
+
+            hardware_power_internal_down();
+        }
+
+        if(device_config.ble_enable) {
+            // if(value_schages)
+            // ble_advertise_not_connection_data_start(...);
+            // k_msleep(10000);
+            // ble_advertise_not_connection_data_stop();    
+        }
+
+        hardware_power_down();
 
         k_msleep(10000);
     }
