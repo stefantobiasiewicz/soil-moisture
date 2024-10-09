@@ -31,7 +31,7 @@ static void EPD_1in9_ReadBusy(void)
     k_msleep(20);
 	while(1)
 	{	 //=1 BUSY;
-		if(pin_controll.pin_busy_read()==true) 
+		if(pin_controll.pin_busy_read()==false) 
 			break;
         //todo timeout condition
 		k_msleep(5);
@@ -95,7 +95,7 @@ static void EPD_1in9_Write_Screen( unsigned char *image)
     uint8_t regs[] = {0xAC, 0x2B, 0x40, 0xA9, 0xA8}; 
     ret = i2c_write_dt(&eink_1in9_com, regs, sizeof(regs));
     if(ret != 0){
-        LOG_ERR("Failed to write to I2C device address %x at reg. %x \n\r", eink_1in9_com.addr,regs[0]);
+        LOG_ERR("Failed to write to I2C device address %x at reg. %x \n\r", eink_1in9_com.addr, regs[0]);
         return;
     }
 
@@ -191,8 +191,6 @@ static void EPD_1in9_lut_5S(void)
  * 
  */
 
-static float temperature_value = 0.0;
-static float humidity_value = 0.0;
 static uint8_t digit_left[] = {0xbf, 0x00, 0xfd, 0xf5, 0x47, 0xf7, 0xff, 0x21, 0xff, 0xf7, 0x00};  
 static uint8_t digit_right[] = {0x1f, 0x1f, 0x17, 0x1f, 0x1f, 0x1d, 0x1d, 0x1f, 0x1f, 0x1f, 0x00};  
 static uint8_t eink_segments[15] = {0x00};  
@@ -259,6 +257,9 @@ void display_init(eink_1in9_pins_t *eink_1in9_pins) {
 
     pin_controll.pin_busy_read = eink_1in9_pins->pin_busy_read;
     pin_controll.pin_reset_set = eink_1in9_pins->pin_reset_set;
+
+    display_power_on();
+    EPD_1in9_lut_5S();
 }
 
 
@@ -291,8 +292,8 @@ void display_power_on() {
 
 
 void display_values(float temperature, float humidity) {
-	updateTemperatureDisplay(temperature_value);
-	updateHumidityDisplay(humidity_value);
+	updateTemperatureDisplay(temperature);
+	updateHumidityDisplay(humidity);
 
 	EPD_1in9_Write_Screen(eink_segments);
 }
