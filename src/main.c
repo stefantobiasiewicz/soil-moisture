@@ -25,13 +25,13 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 
 soil_moisture_calib_data_t soil_moisture_calib_data = {
-    .dry_value = 1000,
-    .wet_value = 2000,
+    .dry_value = 1495,
+    .wet_value = 2702,
 };
 
 deivce_config_t device_config = {
     .ble_enable = false,
-    .display_enable = false,
+    .display_enable = true,
 };
 
 
@@ -66,9 +66,9 @@ static struct hardware_callback_t hardware_callbacks = {
 
 void pin_reset_set(bool set) {
     if (set) {
-        hardware_eink_rst_up();   
+        hardware_eink_rst_active();   
     } else {
-        hardware_eink_rst_down();
+        hardware_eink_rst_inactive();
     } 
 }
 
@@ -104,6 +104,11 @@ k_tid_t periodic_tid;
 
 k_tid_t main_tid;
 
+typedef struct {
+    uint16_t type;
+} button_msgq_item_t;
+K_MSGQ_DEFINE(button_msgq, sizeof(button_msgq_item_t), 5, 1);
+
 
 int main(void)
 {	
@@ -125,9 +130,16 @@ int main(void)
 	// 	error();
 	// }
 
+    
+
     if(device_config.display_enable) {
+        hardware_power_up();
+        hardware_power_internal_up();
+
         display_init(&eink_1in9_pins);
+        display_clean();
     }
+
 
     buttons_tid = k_thread_create(&buttons_thread_data, buttons_stack_area,
                                  K_THREAD_STACK_SIZEOF(buttons_stack_area),
@@ -150,6 +162,18 @@ int main(void)
     while(1) {
         k_msleep(10);
         
+        button_msgq_item_t data;
+        if (k_msgq_get(&button_msgq, &data, K_NO_WAIT) == 0) {
+            if (data.type == 1) {
+                if(device_config.ble_enable) {
+                    //ble_advertise_connection_start();
+                    // led blue pulsing
+                    //sleep
+                    //connection end
+                }
+            }
+        }
+
         k_thread_suspend(main_tid);
     }
 }
@@ -190,6 +214,13 @@ void right_click(void) {
     LOG_INF("Right button single click detected.");
 
     //put to queue
+    button_msgq_item_t data = {
+        .type = 1,
+    };
+    while (k_msgq_put(&button_msgq, &data, K_NO_WAIT) != 0) {
+        /* message queue is full: purge old data & try again */
+        k_msgq_purge(&button_msgq);
+    }
 
     k_thread_resume(main_tid);   
 }
@@ -289,17 +320,23 @@ void periodic_thread(void *, void *, void *) {
 
         int battery_mv_raw = hardware_read_adc_mv_battery();
         float battery = vbat_calculate_battery(battery_mv_raw);
+        LOG_INF("Battery raw (mV): %d, Calculated battery: %.2f", battery_mv_raw, battery);
         k_msleep(20);
 
         int temperature_mv_raw = hardware_read_adc_mv_tempNTC();
-        float ground_temperature = ntc_calcualte_temperatrue(temperature_mv_raw * 1000);
+        float ground_temperature = ntc_calcualte_temperatrue(temperature_mv_raw);
+        LOG_INF("Temperature raw (mV): %d, Calculated temperature: %.2f", temperature_mv_raw, ground_temperature);
         k_msleep(20);
 
         hardware_genrator_on();
         k_msleep(100);
+        
         int soil_moisture_mv_raw = hardware_read_adc_mv_moisture();
         hardware_genrator_off();
+        LOG_INF("Soil moisture raw (mV): %d", soil_moisture_mv_raw);
+        
         float soil_moisture = capacitive_sensor_calculate_moisture(soil_moisture_mv_raw, soil_moisture_calib_data);
+        LOG_INF("Calculated soil moisture: %.2f", soil_moisture);
         k_msleep(20);
 
         bool notify = check_parameters_changes(soil_moisture, ground_temperature, battery, k_uptime_get());

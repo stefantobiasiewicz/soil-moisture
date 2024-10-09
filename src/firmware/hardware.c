@@ -49,42 +49,49 @@ const struct i2c_dt_spec eink_1in9_data = I2C_DT_SPEC_GET(DT_NODELABEL(eink_1in9
 
 
 void hardware_genrator_on() {
-    pwm_set_dt(&generator, 5000 , 2500); 
+    pwm_set_dt(&generator, 5000, 2500);
+    LOG_INF("Generator turned ON: PWM 5000, duty cycle 2500");
 }
 
 void hardware_genrator_off() {
-    pwm_set_dt(&generator, 5000 , 0); 
+    pwm_set_dt(&generator, 5000, 0);
+    LOG_INF("Generator turned OFF: PWM 5000, duty cycle 0");
 }
 
 void hardware_power_up() {
     gpio_pin_set_dt(&power_high, 1);
+    LOG_INF("Power UP: power_high set to 1");
 }
 
 void hardware_power_down() {
     gpio_pin_set_dt(&power_high, 0);
+    LOG_INF("Power DOWN: power_high set to 0");
 }
 
 void hardware_power_internal_up() {
     gpio_pin_set_dt(&power_internal, 1);
+    LOG_INF("Internal Power UP: power_internal set to 1");
 }
 
 void hardware_power_internal_down() {
     gpio_pin_set_dt(&power_internal, 0);
+    LOG_INF("Internal Power DOWN: power_internal set to 0");
 }
 
-/**
- * todo eink pins
- */
 void hardware_eink_rst_active() {
     gpio_pin_set_dt(&eink_rst, 0);
+    LOG_INF("E-Ink Reset ACTIVE: eink_rst set to 0");
 }
 
 void hardware_eink_rst_inactive() {
     gpio_pin_set_dt(&eink_rst, 1);
+    LOG_INF("E-Ink Reset INACTIVE: eink_rst set to 1");
 }
- 
+
 int hardware_eink_busy_read() {
-    return gpio_pin_get_dt(&eink_busy);
+    int busy = gpio_pin_get_dt(&eink_busy);
+    LOG_DBG("E-Ink Busy state read: %d", busy);
+    return busy;
 }
 
 

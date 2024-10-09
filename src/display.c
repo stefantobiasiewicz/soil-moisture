@@ -34,7 +34,7 @@ static void EPD_1in9_ReadBusy(void)
 		if(pin_controll.pin_busy_read()==false) 
 			break;
         //todo timeout condition
-		k_msleep(5);
+		k_msleep(50);
 	}
     k_msleep(20);
     LOG_INF("e-Paper busy release");
@@ -259,7 +259,6 @@ void display_init(eink_1in9_pins_t *eink_1in9_pins) {
     pin_controll.pin_reset_set = eink_1in9_pins->pin_reset_set;
 
     display_power_on();
-    EPD_1in9_lut_5S();
 }
 
 
@@ -301,4 +300,10 @@ void display_values(float temperature, float humidity) {
 
 void display_power_off() {
 
+}
+
+void display_clean() {
+    EPD_1in9_lut_5S();
+    unsigned char DSPNUM_1in9_off[]  = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,       };  // all white
+    EPD_1in9_Write_Screen(DSPNUM_1in9_off);
 }

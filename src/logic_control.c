@@ -132,17 +132,44 @@ float ntc_calcualte_temperatrue(float adc_mv) {
  * @return soil moisture in percetage
  */
 float capacitive_sensor_calculate_moisture(uint16_t raw_value, soil_moisture_calib_data_t calibration_data) {
+    if (raw_value < calibration_data.dry_value) {
+        raw_value = calibration_data.dry_value;
+    } else if (raw_value > calibration_data.wet_value) {
+        raw_value = calibration_data.wet_value;
+    }
 
-    return -1.;
+    // Perform linear interpolation: Map the raw_value from the range [dry_value, wet_value] to [0.0, 100.0]
+    float moisture_percentage = 100.0f * (calibration_data.wet_value - raw_value) 
+                                / (float)(calibration_data.wet_value - calibration_data.dry_value);
+
+
+    if (moisture_percentage < 0.0) {
+        moisture_percentage = 0.0;
+    } else if (moisture_percentage > 100.0) {
+        moisture_percentage = 100.0;
+    }
+
+    return moisture_percentage;
 }
 
 
 /**
+ * took from https://forum.arduino.cc/t/calculate-battery-percentage-of-alkaline-batteries-using-the-voltage/669958/16
  * @return battery in percetage
  */
 float vbat_calculate_battery(uint16_t raw_value) {
+    float v = raw_value / 2000;
 
-    return -1.;
+    if (v >= 1.55)
+        return 100.0; //static value
+    else if (v <= 0)
+        return 0.0; //static value
+    else if (v > 1.4)
+        return 60.60606*v + 6.060606; //linear regression
+    else if (v < 1.1)
+        return 8.3022*v; //linear regression
+    else
+        return 9412 - 23449*v + 19240*v*v - 5176*v*v*v; // cubic regression
 }
 
 /**

@@ -21,6 +21,6 @@ void display_init(eink_1in9_pins_t *eink_1in9_pins);
 void display_power_on();
 void display_values(float temperature, float humidity);
 void display_power_off();
-
+void display_clean();
 
 #endif
