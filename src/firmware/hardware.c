@@ -75,14 +75,14 @@ void hardware_power_internal_down() {
 /**
  * todo eink pins
  */
-void hardware_eink_rst_up() {
-    gpio_pin_set_dt(&eink_rst, 1);
-}
-
-void hardware_eink_rst_down() {
+void hardware_eink_rst_active() {
     gpio_pin_set_dt(&eink_rst, 0);
 }
 
+void hardware_eink_rst_inactive() {
+    gpio_pin_set_dt(&eink_rst, 1);
+}
+ 
 int hardware_eink_busy_read() {
     return gpio_pin_get_dt(&eink_busy);
 }
@@ -204,13 +204,13 @@ bool check_left_button_pressed() {
 }
 
 bool check_right_button_pressed() {
-    LOG_DBG("checking left button state.");
+    LOG_DBG("checking right button state.");
     bool result = false;
-    // if (gpio_pin_get_dt(&button) >= 1) {
-    //     result = true;
-    // }
+    if (gpio_pin_get_dt(&button_right) >= 1) {
+        result = true;
+    }
 
-    // LOG_DBG("button state: %d", result);
+    LOG_DBG("button state: %d", result);
     return result;
 }
 
@@ -419,6 +419,7 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
 	gpio_add_callback(button_left.port, &button_left_cb_data);
 	LOG_INF("Set up button at %s pin %d", button_left.port->name, button_left.pin);
 
+
    if (!device_is_ready(button_right.port)) {
 		LOG_ERR("Error: button device %s is not ready",
 		       button_right.port->name);
@@ -444,7 +445,6 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
 	gpio_add_callback(button_right.port, &button_right_cb_data);
 	LOG_INF("Set up button at %s pin %d", button_right.port->name, button_right.pin);
 
-
 	/**
 	 * i2c uC decvices init
 	 */
@@ -464,6 +464,16 @@ int hardware_init(struct hardware_callback_t * callbacks_p) {
      */
     k_timer_init(&pulse_timer, led_pulse_step, led_timer_end);
     hardware_led_off();
+
+
+
+	/**
+	 * init states 
+	 */
+	hardware_eink_rst_inactive();
+	hardware_genrator_off();
+	hardware_power_down();
+	hardware_power_internal_down();
 
     return err;
 }

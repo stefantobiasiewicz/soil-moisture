@@ -47,8 +47,8 @@ void hardware_power_internal_down();
 /**
  * eink_pins
  */
-void hardware_eink_rst_up();
-void hardware_eink_rst_down();
+void hardware_eink_rst_active();
+void hardware_eink_rst_inactive();
 int hardware_eink_busy_read();
 
 int hardware_read_adc_mv_battery(void);

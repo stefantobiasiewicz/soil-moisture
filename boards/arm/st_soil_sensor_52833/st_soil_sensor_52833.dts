@@ -50,7 +50,7 @@
 			 gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
 			 label = "power high";
 		};   	 		        
-		 power_internal_out: power_internal {
+		power_internal_out: power_internal {
 			 gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
 			 label = "power internal";
 		};   	 		 	 		        
@@ -71,7 +71,7 @@
 			label = "button right";
 		};
 		eink_busy_in: eink_busy {
-			gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
 			label = "eink busy";
 	   };   	
 	};
@@ -103,12 +103,15 @@
 	pinctrl-0 = <&i2c0_default>;
 	pinctrl-1 = <&i2c0_sleep>;
 	pinctrl-names = "default", "sleep";
+	clock-frequency = <I2C_BITRATE_STANDARD>;
 	eink_1in9_com_i2c: eink@3C{
+		status = "okay";
         compatible = "i2c-device";
         reg = < 0x3C >;
         label = "eink_1in9_com";
     };
 	eink_1in9_data_i2c: eink@3D{
+		status = "okay";
         compatible = "i2c-device";
         reg = < 0x3D >;
         label = "eink_1in9_data";
@@ -226,13 +229,13 @@
 
 	i2c0_default: i2c0_default {
 		group1 {
-			psels = <NRF_PSEL(TWIM_SDA, 1, 10)>, <NRF_PSEL(TWIM_SDA, 1, 11)>;
+			psels = <NRF_PSEL(TWIM_SCL, 0, 25)>, <NRF_PSEL(TWIM_SDA, 0, 10)>;
 		};
 	};
 
 	i2c0_sleep: i2c0_sleep {
 		group1 {
-			psels = <NRF_PSEL(TWIM_SDA, 1, 10)>, <NRF_PSEL(TWIM_SDA, 1, 11)>;
+			psels = <NRF_PSEL(TWIM_SCL, 0, 25)>, <NRF_PSEL(TWIM_SDA, 0, 10)>;
 			low-power-enable;
 		};
 	};
