@@ -2,7 +2,8 @@
 
 #include <math.h>
 
-
+#include <zephyr/drivers/sensor/sht4x.h>
+#include <zephyr/drivers/sensor/veml7700.h>
 
 #include <zephyr/logging/log.h>
 
@@ -25,6 +26,9 @@ const struct gpio_dt_spec eink_rst = GPIO_DT_SPEC_GET(DT_NODELABEL(eink_rst_out)
 const struct gpio_dt_spec eink_busy = GPIO_DT_SPEC_GET(DT_NODELABEL(eink_busy_in), gpios);
 
 const struct pwm_dt_spec generator = PWM_DT_SPEC_GET_BY_NAME(ZEPHYR_USER_NODE, generator);
+
+const struct device *veml7700_dev;
+const struct device *sht40_dev;
 
 /**
  * UX
@@ -166,7 +170,7 @@ static int read_mv_from_adc(const struct adc_dt_spec * adc) {
     (void)adc_sequence_init_dt(adc, &sequence);
 
     err = adc_read(adc->dev, &sequence);
-    if (err < 0) {
+    if (err < ERROR_OK) {
         LOG_ERR("Could not read (%d)", err);
         return -1;
     } 
@@ -175,7 +179,7 @@ static int read_mv_from_adc(const struct adc_dt_spec * adc) {
     val_mv = buf;
     err = adc_raw_to_millivolts_dt(adc,
                         &val_mv);
-    if (err < 0) {
+    if (err < ERROR_OK) {
         LOG_ERR(" (value in mV not available)");
         return -1;
     }
@@ -244,244 +248,289 @@ static void right_button_pressed(const struct device *dev, struct gpio_callback 
 
 
 
-int hardware_init(struct hardware_callback_t * callbacks_p) {
-    int err = is_pointer_null(callbacks_p);
-    if (err != ERROR_OK) {
+hardware_init_status_t hardware_init(struct hardware_callback_t *callbacks_p) {
+    hardware_init_status_t result = {0};
+
+    result.error = is_pointer_null(callbacks_p);
+    if (result.error != ERROR_OK) {
         LOG_ERR("callbacks is NULL.");
-        return err;
+        return result;
     }
 
-    err = is_pointer_null(callbacks_p->app_left_button_press);
-    if (err != ERROR_OK) {
-        LOG_ERR("callbacks_p->app_button_press is NULL.");
-        return err;
+    result.error = is_pointer_null(callbacks_p->app_left_button_press);
+    if (result.error != ERROR_OK) {
+        LOG_ERR("callbacks_p->app_left_button_press is NULL.");
+        return result;
     }
     callbacks.app_left_button_press = callbacks_p->app_left_button_press;
 
-    err = is_pointer_null(callbacks_p->app_right_button_press);
-    if (err != ERROR_OK) {
-        LOG_ERR("callbacks_p->app_button_press is NULL.");
-        return err;
+    result.error = is_pointer_null(callbacks_p->app_right_button_press);
+    if (result.error != ERROR_OK) {
+        LOG_ERR("callbacks_p->app_right_button_press is NULL.");
+        return result;
     }
     callbacks.app_right_button_press = callbacks_p->app_right_button_press;
 
+    result.error = !device_is_ready(generator.dev);
+    if (result.error) {
+        LOG_ERR("Pwm for soil sensor device not ready");
+        return result;
+    }
 
-	if (!device_is_ready(generator.dev)) {
-		LOG_ERR("Pwm for soil sensor device not ready");
-		return -1;
-	}
+    result.error = !device_is_ready(power_high.port);
+    if (result.error) {
+        LOG_ERR("Gpio for power high device not ready");
+        return result;
+    }
 
-	if (!device_is_ready(power_high.port)) {
-		LOG_ERR("Gpio for poerw high device not ready");
-		return -1;
-	}
+    result.error = gpio_pin_configure_dt(&power_high, GPIO_OUTPUT);
+    if (result.error < ERROR_OK) {
+        LOG_ERR("Could not setup gpio for power high (%d)", result.error);
+        return result;
+    }
 
-	err = gpio_pin_configure_dt(&power_high, GPIO_OUTPUT);
-	if (err < 0) {
-		LOG_ERR("Could not setup gpio for poerw high (%d)", err);
-		return -1;
-	}
+    result.error = !device_is_ready(power_internal.port);
+    if (result.error) {
+        LOG_ERR("Gpio for power internal device not ready");
+        return result;
+    }
 
-	if (!device_is_ready(power_internal.port)) {
-		LOG_ERR("Gpio for power internal device not ready");
-		return -1;
-	}
+    result.error = gpio_pin_configure_dt(&power_internal, GPIO_OUTPUT);
+    if (result.error < ERROR_OK) {
+        LOG_ERR("Could not setup gpio for power internal (%d)", result.error);
+        return result;
+    }
 
-	err = gpio_pin_configure_dt(&power_internal, GPIO_OUTPUT);
-	if (err < 0) {
-		LOG_ERR("Could not setup gpio for power internal (%d)", err);
-		return -1;
-	}
+    result.error = !device_is_ready(eink_rst.port);
+    if (result.error) {
+        LOG_ERR("Gpio for eink rst device not ready");
+        return result;
+    }
 
-	if (!device_is_ready(eink_rst.port)) {
-		LOG_ERR("Gpio for eink rst internal device not ready");
-		return -1;
-	}
+    result.error = gpio_pin_configure_dt(&eink_rst, GPIO_OUTPUT);
+    if (result.error < ERROR_OK) {
+        LOG_ERR("Could not setup gpio for eink rst (%d)", result.error);
+        return result;
+    }
 
-	err = gpio_pin_configure_dt(&eink_rst, GPIO_OUTPUT);
-	if (err < 0) {
-		LOG_ERR("Could not setup gpio for eink rst (%d)", err);
-		return -1;
-	}
+    result.error = !device_is_ready(eink_busy.port);
+    if (result.error) {
+        LOG_ERR("Gpio for eink busy device not ready");
+        return result;
+    }
 
-    if (!device_is_ready(eink_busy.port)) {
-		LOG_ERR("Gpio for eink busy internal device not ready");
-		return -1;
-	}
-
-	err = gpio_pin_configure_dt(&eink_busy, GPIO_INPUT);
-	if (err < 0) {
-		LOG_ERR("Could not setup gpio for eink busy (%d)", err);
-		return -1;
-	}
+    result.error = gpio_pin_configure_dt(&eink_busy, GPIO_INPUT);
+    if (result.error < ERROR_OK) {
+        LOG_ERR("Could not setup gpio for eink busy (%d)", result.error);
+        return result;
+    }
 
     hardware_power_down();
-    
-    /**
-     * 
-     * adc channels config
-     * 
-    */
-   	if (!device_is_ready(adc_battery_chan.dev)) {
-		LOG_ERR("ADC controller for battery device not ready");
-		return -1;
-	}
 
-	err = adc_channel_setup_dt(&adc_battery_chan);
-	if (err < 0) {
-		LOG_ERR("Could not setup adc battery channel (%d)", err);
-		return -1;
-	}
+    // ADC channels config
+    result.error = !device_is_ready(adc_battery_chan.dev);
+    if (result.error) {
+        LOG_ERR("ADC controller for battery device not ready");
+        return result;
+    }
 
-	if (!device_is_ready(adc_soil_chan.dev)) {
-		LOG_ERR("ADC controller for soil device not ready");
-		return -1;
-	}
+    result.error = adc_channel_setup_dt(&adc_battery_chan);
+    if (result.error < ERROR_OK) {
+        LOG_ERR("Could not setup adc battery channel (%d)", result.error);
+        return result;
+    }
 
-	err = adc_channel_setup_dt(&adc_soil_chan);
-	if (err < 0) {
-		LOG_ERR("Could not setup adc soil channel (%d)", err);
-		return -1;
-	}
+    result.error = !device_is_ready(adc_soil_chan.dev);
+    if (result.error) {
+        LOG_ERR("ADC controller for soil device not ready");
+        return result;
+    }
 
-	if (!device_is_ready(adc_temp_chan.dev)) {
-		LOG_ERR("ADC controller for temperature NTC device not ready");
-		return -1;
-	}
+    result.error = adc_channel_setup_dt(&adc_soil_chan);
+    if (result.error < ERROR_OK) {
+        LOG_ERR("Could not setup adc soil channel (%d)", result.error);
+        return result;
+    }
 
-	err = adc_channel_setup_dt(&adc_temp_chan);
-	if (err < 0) {
-		LOG_ERR("Could not setup adc temperature NTC channel (%d)", err);
-		return -1;
-	}
+    result.error = !device_is_ready(adc_temp_chan.dev);
+    if (result.error) {
+        LOG_ERR("ADC controller for temperature NTC device not ready");
+        return result;
+    }
 
-	if (!device_is_ready(adc_vcc_chan.dev)) {
-		LOG_ERR("ADC controller for vcc device not ready");
-		return -1;
-	}
+    result.error = adc_channel_setup_dt(&adc_temp_chan);
+    if (result.error < ERROR_OK) {
+        LOG_ERR("Could not setup adc temperature NTC channel (%d)", result.error);
+        return result;
+    }
 
-	err = adc_channel_setup_dt(&adc_vcc_chan);
-	if (err < 0) {
-		LOG_ERR("Could not setup adc vcc channel (%d)", err);
-		return -1;
-	}
+    result.error = !device_is_ready(adc_vcc_chan.dev);
+    if (result.error) {
+        LOG_ERR("ADC controller for vcc device not ready");
+        return result;
+    }
 
-    /**
-     * 
-     * pwm led config
-     * 
-    */
-   	LOG_INF("initializing rgb led module");
-   	if (!device_is_ready(pwm_led_r.dev)) {
-		LOG_ERR("Error: PWM device %s is not ready",
-		       pwm_led_r.dev->name);
-		return -1;
-	}
+    result.error = adc_channel_setup_dt(&adc_vcc_chan);
+    if (result.error < ERROR_OK) {
+        LOG_ERR("Could not setup adc vcc channel (%d)", result.error);
+        return result;
+    }
 
+    // PWM led config
+    LOG_INF("initializing rgb led module");
+    result.error = !device_is_ready(pwm_led_r.dev);
+    if (result.error) {
+        LOG_ERR("Error: PWM device %s is not ready", pwm_led_r.dev->name);
+        return result;
+    }
 
-   	if (!device_is_ready(pwm_led_g.dev)) {
-		LOG_ERR("Error: PWM device %s is not ready",
-		       pwm_led_g.dev->name);
-		return -1;
-	}
+    result.error = !device_is_ready(pwm_led_g.dev);
+    if (result.error) {
+        LOG_ERR("Error: PWM device %s is not ready", pwm_led_g.dev->name);
+        return result;
+    }
 
-
-   	if (!device_is_ready(pwm_led_b.dev)) {
-		LOG_ERR("Error: PWM device %s is not ready",
-		       pwm_led_b.dev->name);
-		return -1;
-	}
+    result.error = !device_is_ready(pwm_led_b.dev);
+    if (result.error) {
+        LOG_ERR("Error: PWM device %s is not ready", pwm_led_b.dev->name);
+        return result;
+    }
 
     pwm_set_pulse_dt(&pwm_led_r, PWM_USEC(256));
     pwm_set_pulse_dt(&pwm_led_g, PWM_USEC(256));
     pwm_set_pulse_dt(&pwm_led_b, PWM_USEC(256));
 
+    // Button init
+    result.error = !device_is_ready(button_left.port);
+    if (result.error) {
+        LOG_ERR("Error: button device %s is not ready", button_left.port->name);
+        return result;
+    }
 
-    /**
-     * 
-     * Button init
-     * 
-    */
-   if (!device_is_ready(button_left.port)) {
-		LOG_ERR("Error: button device %s is not ready",
-		       button_left.port->name);
-		return -1;
-	}
+    result.error = gpio_pin_configure_dt(&button_left, GPIO_INPUT);
+    if (result.error != ERROR_OK) {
+        LOG_ERR("Error %d: failed to configure %s pin %d", result.error, button_left.port->name, button_left.pin);
+        return result;
+    }
 
-	err = gpio_pin_configure_dt(&button_left, GPIO_INPUT);
-	if (err != 0) {
-		LOG_ERR("Error %d: failed to configure %s pin %d",
-		       err, button_left.port->name, button_left.pin);
-		return -1;
-	}
+    result.error = gpio_pin_interrupt_configure_dt(&button_left, GPIO_INT_EDGE_TO_ACTIVE);
+    if (result.error != ERROR_OK) {
+        LOG_ERR("Error %d: failed to configure interrupt on %s pin %d", result.error, button_left.port->name, button_left.pin);
+        return result;
+    }
 
-	err = gpio_pin_interrupt_configure_dt(&button_left,
-					      GPIO_INT_EDGE_TO_ACTIVE);
-	if (err != 0) {
-		LOG_ERR("Error %d: failed to configure interrupt on %s pin %d",
-			err, button_left.port->name, button_left.pin);
-		return -1;
-	}
+    gpio_init_callback(&button_left_cb_data, left_button_pressed, BIT(button_left.pin));
+    gpio_add_callback(button_left.port, &button_left_cb_data);
+    LOG_INF("Set up button at %s pin %d", button_left.port->name, button_left.pin);
 
-	gpio_init_callback(&button_left_cb_data, left_button_pressed, BIT(button_left.pin));
-	gpio_add_callback(button_left.port, &button_left_cb_data);
-	LOG_INF("Set up button at %s pin %d", button_left.port->name, button_left.pin);
+    result.error = !device_is_ready(button_right.port);
+    if (result.error) {
+        LOG_ERR("Error: button device %s is not ready", button_right.port->name);
+        return result;
+    }
 
+    result.error = gpio_pin_configure_dt(&button_right, GPIO_INPUT);
+    if (result.error != ERROR_OK) {
+        LOG_ERR("Error %d: failed to configure %s pin %d", result.error, button_right.port->name, button_right.pin);
+        return result;
+    }
 
-   if (!device_is_ready(button_right.port)) {
-		LOG_ERR("Error: button device %s is not ready",
-		       button_right.port->name);
-		return -1;
-	}
+    result.error = gpio_pin_interrupt_configure_dt(&button_right, GPIO_INT_EDGE_TO_ACTIVE);
+    if (result.error != ERROR_OK) {
+        LOG_ERR("Error %d: failed to configure interrupt on %s pin %d", result.error, button_right.port->name, button_right.pin);
+        return result;
+    }
 
-	err = gpio_pin_configure_dt(&button_right, GPIO_INPUT);
-	if (err != 0) {
-		LOG_ERR("Error %d: failed to configure %s pin %d",
-		       err, button_right.port->name, button_right.pin);
-		return -1;
-	}
+    gpio_init_callback(&button_right_cb_data, right_button_pressed, BIT(button_right.pin));
+    gpio_add_callback(button_right.port, &button_right_cb_data);
+    LOG_INF("Set up button at %s pin %d", button_right.port->name, button_right.pin);
 
-	err = gpio_pin_interrupt_configure_dt(&button_right,
-					      GPIO_INT_EDGE_TO_ACTIVE);
-	if (err != 0) {
-		LOG_ERR("Error %d: failed to configure interrupt on %s pin %d",
-			err, button_right.port->name, button_right.pin);
-		return -1;
-	}
+    // I2C devices init
+    result.error = !device_is_ready(eink_1in9_com.bus);
+    if (result.error) {
+        LOG_ERR("I2C bus %s is not ready!", eink_1in9_com.bus->name);
+        return result;
+    }
 
-	gpio_init_callback(&button_right_cb_data, right_button_pressed, BIT(button_right.pin));
-	gpio_add_callback(button_right.port, &button_right_cb_data);
-	LOG_INF("Set up button at %s pin %d", button_right.port->name, button_right.pin);
+    result.error = !device_is_ready(eink_1in9_data.bus);
+    if (result.error) {
+        LOG_ERR("I2C bus %s is not ready!", eink_1in9_data.bus->name);
+        return result;
+    }
 
-	/**
-	 * i2c uC decvices init
-	 */
-	if (!device_is_ready(eink_1in9_com.bus)) {
-		LOG_ERR("I2C bus %s is not ready!\n\r",eink_1in9_com.bus->name);
-		return -1;
-	}
-
-	if (!device_is_ready(eink_1in9_data.bus)) {
-		LOG_ERR("I2C bus %s is not ready!\n\r",eink_1in9_data.bus->name);
-		return -1;
-	}
-
-
-    /**
-     * timer init
-     */
+    // Timer init
     k_timer_init(&pulse_timer, led_pulse_step, led_timer_end);
     hardware_led_off();
 
+    // Initial states
+    hardware_eink_rst_inactive();
+    hardware_genrator_off();
+
+    hardware_power_up();
+    hardware_power_internal_up();
 
 
-	/**
-	 * init states 
-	 */
-	hardware_eink_rst_inactive();
-	hardware_genrator_off();
-	hardware_power_down();
-	hardware_power_internal_down();
+    k_msleep(200);
+    if (get_inited_veml7700() != NULL) {
+        result.veml7700_avaliavle = true;
+    }
 
-    return err;
+    if (get_inited_sht40() != NULL) {
+        result.sht40_avaliavle = true;
+    }
+
+    hardware_power_down();
+    hardware_power_internal_down();
+
+
+    return result;
+}
+
+
+bool check_both_voltages() {
+    return  gpio_pin_get_dt(&power_high) && gpio_pin_get_dt(&power_internal);
+}
+
+const struct device * get_inited_veml7700() {
+    if (!check_both_voltages()) {
+        LOG_ERR("veml7700 device not powered up!!!");
+        return NULL;
+    }
+
+    veml7700_dev = DEVICE_DT_GET(DT_NODELABEL(veml7700));
+    if (veml7700_dev != NULL) {
+        device_init(veml7700_dev);
+
+        if (!device_is_ready(veml7700_dev)) {
+            LOG_ERR("Device %s is not ready.\n", veml7700_dev->name);
+            return NULL;
+        }
+
+        return veml7700_dev;
+    }
+
+    LOG_ERR("can't find VEML7700 device");
+    return NULL;
+}
+
+const struct device * get_inited_sht40() {
+    if (!check_both_voltages()) {
+        LOG_ERR("sht40 device not powered up!!!");
+        return NULL;
+    }
+
+    sht40_dev = DEVICE_DT_GET(DT_NODELABEL(sht40));
+    if (sht40_dev != NULL) {
+        device_init(sht40_dev);
+
+        if (!device_is_ready(sht40_dev)) {
+            LOG_ERR("Device %s is not ready.\n", sht40_dev->name);
+            return NULL;
+        }
+
+        return sht40_dev;
+    }
+
+    LOG_ERR("can't find SHT40 device");
+    return NULL;
 }

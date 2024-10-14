@@ -116,6 +116,21 @@
         reg = < 0x3D >;
         label = "eink_1in9_data";
     };
+	veml7700: veml7700@10 {
+		status = "okay";
+        compatible = "vishay,veml7700";
+        reg = <0x10>;
+        label = "VEML7700";
+		zephyr,deferred-init;
+    };
+    sht40: sht40@44 {
+		status = "okay";
+        compatible = "sensirion,sht4x";
+        reg = <0x44>;
+        label = "SHT40";
+		repeatability = < 2 >;
+		zephyr,deferred-init;
+    };
 };
 
 
