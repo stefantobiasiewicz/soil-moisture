@@ -1,6 +1,8 @@
 #ifndef HARDWARE_HH
 #define HARDWARE_HH
 
+
+#include "../main.h"
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
@@ -12,11 +14,6 @@
 #include <zephyr/drivers/gpio.h>
 
 
-typedef struct {
-    bool error;
-    bool veml7700_avaliavle;
-    bool sht40_avaliavle;
-} hardware_init_status_t;
 
 
 extern const struct i2c_dt_spec eink_1in9_com;

@@ -25,8 +25,16 @@ typedef struct  {
 } soil_moisture_calib_data_t;
 
 typedef struct {
+    bool error;
+    bool veml7700_avaliavle;
+    bool sht40_avaliavle;
+} hardware_init_status_t;
+
+typedef struct {
 	bool ble_enable;
 	bool display_enable;
+
+	hardware_init_status_t
 } deivce_config_t;
 
 

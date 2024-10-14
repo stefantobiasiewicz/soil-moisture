@@ -10,6 +10,7 @@
 #include <zephyr/drivers/adc.h>
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/drivers/sensor.h>
 
 #include "firmware/hardware.h"
 #include "firmware/flash.h"
@@ -117,9 +118,12 @@ int main(void)
     LOG_INF("##                                           ##");
     LOG_INF("###############################################");
 
-	if (hardware_init(&hardware_callbacks) != ERROR_OK) {
+    hardware_init_status_t init_status = hardware_init(&hardware_callbacks);
+	if (init_status.error != ERROR_OK) {
 		error();
 	}
+
+    device_config.hardware_init_status = init_status;
 
 	if (flash_init() != ERROR_OK) {
 		error();
@@ -313,30 +317,10 @@ void periodic_thread(void *, void *, void *) {
                 publish
         */
         hardware_power_up();
-        k_msleep(20);
 
-        int battery_mv_raw = hardware_read_adc_mv_battery();
-        float battery = vbat_calculate_battery(battery_mv_raw);
-        LOG_INF("Battery raw (mV): %d, Calculated battery: %.2f", battery_mv_raw, battery);
-        k_msleep(20);
+        measurments_t results = make_measurements();
 
-        int temperature_mv_raw = hardware_read_adc_mv_tempNTC();
-        float ground_temperature = ntc_calcualte_temperatrue(temperature_mv_raw);
-        LOG_INF("Temperature raw (mV): %d, Calculated temperature: %.2f", temperature_mv_raw, ground_temperature);
-        k_msleep(20);
-
-        hardware_genrator_on();
-        k_msleep(100);
-        
-        int soil_moisture_mv_raw = hardware_read_adc_mv_moisture();
-        hardware_genrator_off();
-        LOG_INF("Soil moisture raw (mV): %d", soil_moisture_mv_raw);
-        
-        float soil_moisture = capacitive_sensor_calculate_moisture(soil_moisture_mv_raw, soil_moisture_calib_data);
-        LOG_INF("Calculated soil moisture: %.2f", soil_moisture);
-        k_msleep(20);
-
-        bool notify = check_parameters_changes(soil_moisture, ground_temperature, battery, k_uptime_get());
+        bool notify = check_parameters_changes(results.soil_moisture, results.ground_temperature, results.battery, k_uptime_get());
 
         if(notify) {
             if(device_config.display_enable) {
@@ -344,9 +328,10 @@ void periodic_thread(void *, void *, void *) {
                     hardware_power_internal_up();
 
                     display_power_on();
-                    display_values(ground_temperature, soil_moisture);
+                    display_values(results.ground_temperature, results.soil_moisture);
 
                     k_msleep(100);
+                    
                     hardware_power_internal_down();
                 }
             }
@@ -363,4 +348,93 @@ void periodic_thread(void *, void *, void *) {
 
         k_msleep(get_next_wakeup_time_ms());
     }
+}
+
+
+typedef struct {
+    int battery_mv_raw;
+    float battery;
+    int temperature_mv_raw;
+    float ground_temperature;
+    int soil_moisture_mv_raw;
+    float soil_moisture;
+    float lux;
+    float air_temperature;
+    float air_humidity;
+} measurments_t;
+
+measurments_t make_measurements(void) {
+    measurments_t result = {0};
+ 
+    k_msleep(20);
+
+    result.battery_mv_raw = hardware_read_adc_mv_battery();
+    result.battery = vbat_calculate_battery(result.battery_mv_raw);
+    LOG_INF("Battery raw (mV): %d, Calculated battery: %.2f", result.battery_mv_raw, result.battery);
+    k_msleep(20);
+
+    result.temperature_mv_raw = hardware_read_adc_mv_tempNTC();
+    result.ground_temperature = ntc_calcualte_temperatrue(result.temperature_mv_raw);
+    LOG_INF("Temperature raw (mV): %d, Calculated temperature: %.2f", result.temperature_mv_raw, result.ground_temperature);
+    k_msleep(20);
+
+    hardware_genrator_on();
+    k_msleep(100);
+    
+    result.soil_moisture_mv_raw = hardware_read_adc_mv_moisture();
+    hardware_genrator_off();
+    LOG_INF("Soil moisture raw (mV): %d", result.soil_moisture_mv_raw);
+    
+    float soil_moisture = capacitive_sensor_calculate_moisture(result.soil_moisture_mv_raw, soil_moisture_calib_data);
+    LOG_INF("Calculated soil moisture: %.2f", result.soil_moisture);
+    k_msleep(20);
+
+
+    if (device_config.hardware_init_status.veml7700_avaliavle) {
+        hardware_power_internal_up();
+        k_msleep(300);      
+
+        const struct device * veml7700_dev = get_inited_veml7700();
+        struct sensor_value lux_value;
+
+        if (sensor_sample_fetch(veml7700_dev) < 0) {
+            LOG_ERR("Error feching data from VEML7700");
+        }
+
+        if (sensor_channel_get(veml7700_dev, SENSOR_CHAN_LIGHT, &lux_value) < 0) {
+            LOG_ERR("Error getting data from VEML7700");
+        }
+
+        result.lux = sensor_value_to_float(&lux_value);
+        LOG_INF("Light sense: %d.%06d lux", lux_value.val1, lux_value.val2);
+    }
+
+    k_msleep(20);
+    if (device_config.hardware_init_status.sht40_avaliavle) {
+        hardware_power_internal_up();
+
+        const struct device * sht40_dev = get_inited_sht40();
+        struct sensor_value temp_value, humidity_value;
+
+
+        if (sensor_sample_fetch(sht40_dev) < 0) {
+            LOG_ERR("Error feching data from SHT40");
+        }
+
+        if (sensor_channel_get(sht40_dev, SENSOR_CHAN_AMBIENT_TEMP, &temp_value) < 0) {
+            LOG_ERR("Error getting data from SHT40");
+        }
+
+        if (sensor_channel_get(sht40_dev, SENSOR_CHAN_HUMIDITY, &humidity_value) < 0) {
+            LOG_ERR("Error getting data from SHT40");
+        }
+
+        result.air_temperature = sensor_value_to_float(&temp_value);
+        result.air_humidity = sensor_value_to_float(&humidity_value);
+
+        LOG_INF("Temperature: %d.%06d °C", temp_value.val1, temp_value.val2);
+        LOG_INF("Humidity: %d.%06d %%", humidity_value.val1, humidity_value.val2);
+    }
+
+    hardware_power_internal_down();
 }
