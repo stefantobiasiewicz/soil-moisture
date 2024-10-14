@@ -56,6 +56,7 @@ void error() {
 	sys_reboot(0);
 }
 
+measurments_t make_measurements(void);
 
 void app_left_button_press();
 void app_right_button_press();
@@ -351,17 +352,6 @@ void periodic_thread(void *, void *, void *) {
 }
 
 
-typedef struct {
-    int battery_mv_raw;
-    float battery;
-    int temperature_mv_raw;
-    float ground_temperature;
-    int soil_moisture_mv_raw;
-    float soil_moisture;
-    float lux;
-    float air_temperature;
-    float air_humidity;
-} measurments_t;
 
 measurments_t make_measurements(void) {
     measurments_t result = {0};

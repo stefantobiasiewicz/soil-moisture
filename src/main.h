@@ -34,8 +34,20 @@ typedef struct {
 	bool ble_enable;
 	bool display_enable;
 
-	hardware_init_status_t
+	hardware_init_status_t hardware_init_status;
 } deivce_config_t;
+
+typedef struct {
+    int battery_mv_raw;
+    float battery;
+    int temperature_mv_raw;
+    float ground_temperature;
+    int soil_moisture_mv_raw;
+    float soil_moisture;
+    float lux;
+    float air_temperature;
+    float air_humidity;
+} measurments_t;
 
 
 #endif
