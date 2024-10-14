@@ -156,6 +156,7 @@ static int read_mv_from_adc(const struct adc_dt_spec * adc) {
 
     int16_t buf;
 	struct adc_sequence sequence = {
+		.oversampling = 16,
 		.buffer = &buf,
 		.buffer_size = sizeof(buf),
 	};

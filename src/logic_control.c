@@ -128,6 +128,30 @@ float ntc_calcualte_temperatrue(float adc_mv) {
 
 
 
+// Stałe współczynniki z podanego wzoru
+#define A -452.23
+#define B 2790.2
+
+// Maksymalna wartość zmiennej_0_8
+#define MAX_SENSOR_VALUE 8.0
+
+// Funkcja obliczająca procent na podstawie sensor_value
+double calculate_percentage_from_sensor_value(double sensor_value) {
+    // Sprawdzamy, czy sensor_value mieści się w zakresie, aby uniknąć logarytmu z wartości <= 0
+    if (sensor_value >= B || sensor_value <= (B + A * log(MAX_SENSOR_VALUE))) {
+        printf("Error: Sensor value out of valid range\n");
+        return NAN;
+    }
+
+    // Obliczenie zmienna_0_8 na podstawie sensor_value
+    double zmienna_0_8 = exp(-(sensor_value - B) / A);
+
+    // Mapowanie zmienna_0_8 na zakres 0-100%
+    double percentage = (zmienna_0_8 / MAX_SENSOR_VALUE) * 100;
+
+    return percentage;
+}
+
 /**
  * @return soil moisture in percetage
  */
@@ -137,6 +161,7 @@ float capacitive_sensor_calculate_moisture(uint16_t raw_value, soil_moisture_cal
     } else if (raw_value > calibration_data.wet_value) {
         raw_value = calibration_data.wet_value;
     }
+
 
     // Perform linear interpolation: Map the raw_value from the range [dry_value, wet_value] to [0.0, 100.0]
     float moisture_percentage = 100.0f * (calibration_data.wet_value - raw_value) 
@@ -185,5 +210,5 @@ bool check_parameters_changes(float soil_moisture, float ground_temperature, flo
  * @return next wake up time for checking parameters base on changes detected by @see check_parameters_changes(...) function
  */
 int get_next_wakeup_time_ms() {
-    return 10000;
+    return 3000;
 }

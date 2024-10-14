@@ -72,7 +72,6 @@ void pin_reset_set(bool set) {
     } 
 }
 
-
 bool pin_busy_read() {
     return hardware_eink_busy_read() == 1 ? true : false;
 }
@@ -129,8 +128,6 @@ int main(void)
 	// if (ble_init(&application) != ERROR_OK) {
 	// 	error();
 	// }
-
-    
 
     if(device_config.display_enable) {
         hardware_power_up();
