@@ -10,9 +10,22 @@
         "adc.h": "c",
         "display.h": "c",
         "log.h": "c",
-        "validation.h": "c"
+        "validation.h": "c",
+        "bluetooth.h": "c",
+        "pwm.h": "c",
+        "veml7700.h": "c",
+        "sht4x.h": "c",
+        "typeinfo": "c",
+        "device.h": "c",
+        "logic_control.h": "c",
+        "stdio.h": "c",
+        "math.h": "c",
+        "stdlib.h": "c",
+        "*.tcc": "c",
+        "cmath": "c"
     },
     "nrf-connect.debugging.bindings": {
         "${workspaceFolder}/nrf52833-dev": "Launch nrf52833-dev"
-    }
+    },
+    "nrf-connect.topdir": "${nrf-connect.sdk:2.7.0}"
 }
