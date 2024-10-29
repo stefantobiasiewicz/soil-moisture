@@ -31,8 +31,9 @@ soil_moisture_calib_data_t soil_moisture_calib_data = {
 };
 
 deivce_config_t device_config = {
-    .ble_enable = false,
-    .display_enable = true,
+    .ble_enable = true,
+    .display_enable = false,
+    .periodic_thread_suspend = true,
 };
 
 
@@ -49,14 +50,14 @@ void log_current_thread_info() {
     LOG_INF("###########################################");
 }
 
-
 void error() {
 	LOG_ERR("Application occur error rebooting.");
 	k_sleep(K_MSEC(3000));
 	sys_reboot(0);
 }
 
-measurments_t make_measurements(void);
+measurments_t make_short_measurements(void);
+measurments_t make_full_measurements(void);
 
 void app_left_button_press();
 void app_right_button_press();
@@ -81,6 +82,20 @@ bool pin_busy_read() {
 eink_1in9_pins_t eink_1in9_pins = {
     .pin_reset_set = pin_reset_set, 
     .pin_busy_read = pin_busy_read
+};
+
+
+void app_ble_connected(void) {
+
+}
+void app_ble_disconnected(void) {
+
+}
+
+application_api_t applciation_api =
+{
+    .app_connected = app_ble_connected,
+    .app_disconnected = app_ble_disconnected,
 };
 
 
@@ -130,9 +145,9 @@ int main(void)
 		error();
 	}
 
-	// if (ble_init(&application) != ERROR_OK) {
-	// 	error();
-	// }
+	if (ble_init(&applciation_api) != ERROR_OK) {
+		error();
+	}
 
     if(device_config.display_enable) {
         hardware_power_up();
@@ -168,10 +183,13 @@ int main(void)
         if (k_msgq_get(&button_msgq, &data, K_NO_WAIT) == 0) {
             if (data.type == 1) {
                 if(device_config.ble_enable) {
-                    //ble_advertise_connection_start();
+                    hardware_set_led_color(0,0,255);
+                    ble_advertise_connection_start();
                     // led blue pulsing
-                    //sleep
+                    k_msleep(5000);
                     //connection end
+                    ble_advertise_connection_stop();
+                    hardware_led_off();
                 }
             }
         }
@@ -204,17 +222,15 @@ void app_right_button_press() {
 
 void left_click(void) {
     LOG_INF("Left button single click detected.");
-    hardware_led_pulse_start(255, 0, 0, K_MSEC(2000));
+
+    hardware_power_up();
+    make_full_measurements();
+    hardware_power_down();
 }
 
 void left_long_click(void) {
     LOG_INF("Left button long click detected.");
-    hardware_led_off();
-}
-
-void right_click(void) {
-    LOG_INF("Right button single click detected.");
-
+    
     //put to queue
     button_msgq_item_t data = {
         .type = 1,
@@ -225,6 +241,10 @@ void right_click(void) {
     }
 
     k_thread_resume(main_tid);   
+}
+
+void right_click(void) {
+    LOG_INF("Right button single click detected.");
 }
 
 void right_long_click(void) {
@@ -304,6 +324,12 @@ void periodic_thread(void *, void *, void *) {
 
     while (1)
     {
+        if(device_config.periodic_thread_suspend) {
+            LOG_INF("Periodic thread suspend.");
+            k_msleep(20000);
+            continue;
+        }
+
         LOG_INF("Periodic measurments and data sharing.");
 
         /*
@@ -317,9 +343,9 @@ void periodic_thread(void *, void *, void *) {
             check if need to publish by ble
                 publish
         */
+       
         hardware_power_up();
-
-        measurments_t results = make_measurements();
+        measurments_t results = make_full_measurements();
 
         bool notify = check_parameters_changes(results.soil_moisture, results.ground_temperature, results.battery, k_uptime_get());
 
@@ -338,7 +364,6 @@ void periodic_thread(void *, void *, void *) {
             }
 
             if(device_config.ble_enable) {
-                // if(value_schages)
                 // ble_advertise_not_connection_data_start(...);
                 // k_msleep(10000);
                 // ble_advertise_not_connection_data_stop();    
@@ -352,8 +377,31 @@ void periodic_thread(void *, void *, void *) {
 }
 
 
+/**
+ * Function measure soil and temperature data from sensor
+ * @note Function need to voltage high (3v3) disabled 
+ * @return readings are not valid to present. Result can be use only for fast check and prediction of fast changing parameters
+ */
+measurments_t make_short_measurements(void) {
+    measurments_t result = {0};
+    result.temperature_mv_raw = hardware_read_adc_mv_tempNTC();
+    LOG_INF("Temperature raw (mV): %d", result.temperature_mv_raw);
 
-measurments_t make_measurements(void) {
+    hardware_genrator_on();
+    k_msleep(100);
+    
+    result.soil_moisture_mv_raw = hardware_read_adc_mv_moisture();
+    hardware_genrator_off();
+    LOG_INF("Soil moisture raw (mV): %d", result.soil_moisture_mv_raw);
+
+    return result;
+}
+
+/**
+ * Fucntion measure all readings form sensors
+ * @note Function need voltae high (3v3) pull up
+ */
+measurments_t make_full_measurements(void) {
     measurments_t result = {0};
  
     k_msleep(20);
@@ -375,7 +423,7 @@ measurments_t make_measurements(void) {
     hardware_genrator_off();
     LOG_INF("Soil moisture raw (mV): %d", result.soil_moisture_mv_raw);
     
-    float soil_moisture = capacitive_sensor_calculate_moisture(result.soil_moisture_mv_raw, soil_moisture_calib_data);
+    result.soil_moisture = capacitive_sensor_calculate_moisture(result.soil_moisture_mv_raw, soil_moisture_calib_data);
     LOG_INF("Calculated soil moisture: %.2f", result.soil_moisture);
     k_msleep(20);
 

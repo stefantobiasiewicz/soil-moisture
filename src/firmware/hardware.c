@@ -1,7 +1,5 @@
 #include "hardware.h"
 
-#include <math.h>
-
 #include <zephyr/drivers/sensor/sht4x.h>
 #include <zephyr/drivers/sensor/veml7700.h>
 
@@ -108,22 +106,6 @@ static uint8_t pulse_green = 0;
 static uint8_t pulse_blue = 0;   
 
 #define M_PI		3.14159265358979323846
-
-static void led_pulse_step() {
-    float brightness_factor = (sin(time_step) + 1) / 2; 
-
-    uint8_t lr = (uint8_t)(pulse_red * brightness_factor);
-    uint8_t lg = (uint8_t)(pulse_green * brightness_factor);
-    uint8_t lb = (uint8_t)(pulse_blue * brightness_factor);
-
-    hardware_set_led_color(lr, lg, lb);
-
-    time_step += pulse_speed;
-
-    if (time_step > 2 * M_PI) {
-        time_step = 0;
-    }
-}
 
 static void led_timer_end() {
     hardware_set_led_color(0,0,0);
@@ -459,7 +441,7 @@ hardware_init_status_t hardware_init(struct hardware_callback_t *callbacks_p) {
     }
 
     // Timer init
-    k_timer_init(&pulse_timer, led_pulse_step, led_timer_end);
+    // k_timer_init(&pulse_timer, led_pulse_step, led_timer_end);
     hardware_led_off();
 
     // Initial states

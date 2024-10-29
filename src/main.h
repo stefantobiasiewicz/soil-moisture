@@ -33,6 +33,7 @@ typedef struct {
 typedef struct {
 	bool ble_enable;
 	bool display_enable;
+    bool periodic_thread_suspend;
 
 	hardware_init_status_t hardware_init_status;
 } deivce_config_t;
@@ -48,6 +49,19 @@ typedef struct {
     float air_temperature;
     float air_humidity;
 } measurments_t;
+
+
+/**
+ * data is multyply by 10 so 235 == 23,5%
+ */
+typedef struct {
+    uint16_t battery;
+    uint16_t ground_temperature;
+    uint16_t soil_moisture;
+    uint16_t lux;
+    uint16_t air_temperature;
+    uint16_t air_humidity;
+} measurments_ble_adv_data_t;
 
 
 #endif

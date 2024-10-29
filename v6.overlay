@@ -1,0 +1,82 @@
+
+
+
+/ {
+    buttons {
+        compatible = "gpio-keys";
+        
+        button0: button_0 {
+            gpios = <&gpio0 7 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "button left";
+        };
+        
+        button1: button_1 {
+            gpios = <&gpio0 31 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "button right";
+        };
+		eink_busy_in: eink_busy {
+			status = "disabled";
+			gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+			label = "eink busy";
+	   };   
+    };
+
+
+	outputs {
+		compatible = "gpio-leds";	 		 	 		        
+		eink_rst_out: eink_rst {
+			status = "disabled";
+			gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
+			label = "eink reset";
+		};   	 				 	 		         		
+	 };  
+};
+
+
+
+&spi3 {
+	status = "okay";
+	cs-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;    	/* D10 */
+    pinctrl-0 = < &spi3_default>;
+    pinctrl-1 = < &spi3_sleep>;
+	ssd16xx: ssd16xxfb@0 {
+        compatible = "generic,epd";
+		status = "okay";
+		spi-max-frequency = <1000000>;
+		reg = <0>;
+		dc-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;       
+		reset-gpios =  <&gpio0 26 GPIO_ACTIVE_HIGH>;   
+		busy-gpios =  <&gpio0 6 GPIO_ACTIVE_HIGH>;   
+	};
+};
+
+
+&pinctrl {
+    spi3_default: spi3_default {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 1, 4)>,
+				<NRF_PSEL(SPIM_MOSI, 1, 6)>;
+		};
+	};
+
+	spi3_sleep: spi3_sleep {
+		group1 {
+			psels = <NRF_PSEL(SPIM_SCK, 1, 4)>,
+				<NRF_PSEL(SPIM_MOSI, 1, 6)>;
+			low-power-enable;
+		};
+	};
+
+	i2c0_default: i2c0_default {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SCL, 0, 8)>, <NRF_PSEL(TWIM_SDA, 0, 12)>;
+		};
+	};
+
+	i2c0_sleep: i2c0_sleep {
+		group1 {
+			psels = <NRF_PSEL(TWIM_SCL, 0, 8)>, <NRF_PSEL(TWIM_SDA, 0, 12)>;
+			low-power-enable;
+		};
+	};
+};

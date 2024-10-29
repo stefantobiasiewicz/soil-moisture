@@ -14,21 +14,32 @@ LOG_MODULE_REGISTER(ble, LOG_LEVEL_DBG);
 
 #define APP_VERSION 0x0005
 
-static ssize_t bt_calibration(struct bt_conn *conn,
-					     const struct bt_gatt_attr *attr,
-					     const void *buf, uint16_t len,
-					     uint16_t offset, uint8_t flags);
 
-static ssize_t bt_time_interval_read(struct bt_conn *conn,
+static ssize_t bt_commands_read(struct bt_conn *conn,
 					    const struct bt_gatt_attr *attr,
 					    void *buf, uint16_t len,
 					    uint16_t offset);		
 
-static ssize_t bt_time_interval_write(struct bt_conn *conn,
+static ssize_t bt_commands_write(struct bt_conn *conn,
 					     const struct bt_gatt_attr *attr,
 					     const void *buf, uint16_t len,
 					     uint16_t offset, uint8_t flags);
 
+
+static void soil_moisture_service_ccc_cfg_changed(const struct bt_gatt_attr *attr,
+				  uint16_t value);
+
+static ssize_t bt_soil_moisture_read(struct bt_conn *conn,
+					    const struct bt_gatt_attr *attr,
+					    void *buf, uint16_t len,
+					    uint16_t offset);		
+
+static ssize_t bt_battery_read(struct bt_conn *conn,
+					    const struct bt_gatt_attr *attr,
+					    void *buf, uint16_t len,
+					    uint16_t offset);		
+																		 
+														 
 static void soil_moisture_service_ccc_cfg_changed(const struct bt_gatt_attr *attr,
 				  uint16_t value);
 
@@ -45,36 +56,16 @@ static ssize_t bt_battery_read(struct bt_conn *conn,
 
 BT_GATT_SERVICE_DEFINE(soil_moisture_service,
 	BT_GATT_PRIMARY_SERVICE(BT_UUID_SOIL_MOISTURE_SERVICE),
-	BT_GATT_CHARACTERISTIC(BT_UUID_CALIBRATION,
-					(BT_GATT_CHRC_WRITE),
-					(BT_GATT_PERM_WRITE), 
-					NULL, 
-					bt_calibration,
-					NULL),
-	BT_GATT_CHARACTERISTIC(BT_UUID_TIME_INTERVAL,
+	BT_GATT_CHARACTERISTIC(BT_UUID_COMMANDS,
 					(BT_GATT_CHRC_WRITE | BT_GATT_CHRC_READ),
 					(BT_GATT_PERM_WRITE | BT_GATT_PERM_READ),
-					bt_time_interval_read,
-					bt_time_interval_write,
-					NULL),
-	BT_GATT_CHARACTERISTIC(BT_UUID_SOIL_MOISTURE,
-					(BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY),
-					BT_GATT_PERM_READ,
-					bt_soil_moisture_read,
-					NULL,
-					NULL),
-    BT_GATT_CCC(soil_moisture_service_ccc_cfg_changed,
-		            BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-	BT_GATT_CHARACTERISTIC(BT_UUID_BATTERY_LEVEL,
-					BT_GATT_CHRC_READ,
-					BT_GATT_PERM_READ,
-					bt_battery_read,
-					NULL,
-					NULL),
+					bt_commands_read,
+					bt_commands_write,
+					NULL)
 );
 
 struct bt_conn *my_conn = NULL;
-static struct application_api application;
+static application_api_t application;
 
 static bool notification_enabled = false;
 
@@ -202,115 +193,41 @@ static int init_radio() {
 }
 
 
-static ssize_t bt_calibration(struct bt_conn *conn,
+static ssize_t bt_commands_write(struct bt_conn *conn,
 					     const struct bt_gatt_attr *attr,
 					     const void *buf, uint16_t len,
 					     uint16_t offset, uint8_t flags) {
-	LOG_INF("ble: calibration update.");
+	LOG_INF("ble: writing command.");
 
 	uint16_t val = *((uint16_t *)buf);
 
-	LOG_INF("ble: seconds: %d.", val);
+	LOG_INF("ble: command: %d.", val);
 
-	application.app_calibrate(val);
+	// application.app_set_sleep_time(val);
 
 	return len;
 }
 
-
-static ssize_t bt_time_interval_write(struct bt_conn *conn,
-					     const struct bt_gatt_attr *attr,
-					     const void *buf, uint16_t len,
-					     uint16_t offset, uint8_t flags) {
-	LOG_INF("ble: writing time interval.");
-
-	uint16_t val = *((uint16_t *)buf);
-
-	LOG_INF("ble: seconds: %d.", val);
-
-	application.app_set_sleep_time(val);
-
-	return len;
-}
-
-static ssize_t bt_time_interval_read(struct bt_conn *conn,
+static ssize_t bt_commands_read(struct bt_conn *conn,
 					    const struct bt_gatt_attr *attr,
 					    void *buf, uint16_t len,
 					    uint16_t offset) {
 	LOG_INF("ble: reading time interval.");
 	
-	uint16_t value = application.app_get_sleep_time();
+	uint16_t value = 0xaa;//application.app_get_sleep_time();
 	LOG_INF("ble: seconds: %d.", value);
 
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, &value, sizeof(value));
 }
 
-static ssize_t bt_soil_moisture_read(struct bt_conn *conn,
-					    const struct bt_gatt_attr *attr,
-					    void *buf, uint16_t len,
-					    uint16_t offset) {
-	LOG_INF("ble: reading soil moisture value: [%d].", adv_mfg_data.ble_soil_moisture_value);
-	
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, &adv_mfg_data.ble_soil_moisture_value, sizeof(adv_mfg_data.ble_soil_moisture_value));
-}
-
-static ssize_t bt_battery_read(struct bt_conn *conn,
-					    const struct bt_gatt_attr *attr,
-					    void *buf, uint16_t len,
-					    uint16_t offset) {
-	LOG_INF("ble: reading battery value: [%d].", adv_mfg_data.ble_battery_value);
-	
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, &adv_mfg_data.ble_battery_value, sizeof(adv_mfg_data.ble_battery_value));
-}
-
-static void soil_moisture_service_ccc_cfg_changed(const struct bt_gatt_attr *attr,
-				  uint16_t value)
-{
-	notification_enabled = (value == BT_GATT_CCC_NOTIFY);
-}
 
 
-int ble_send_notify(uint16_t soil_value, uint16_t battery_value)
-{
-	LOG_INF("ble: setting battery value: [%d] and soil value: [%d].", battery_value, soil_value);
-	adv_mfg_data.ble_battery_value = battery_value;
-	adv_mfg_data.ble_soil_moisture_value = soil_value;
-
-
-	LOG_INF("sending notification with soil value: [%d].", (int) soil_value);
-	if (!notification_enabled) {
-		LOG_WRN("notification not permited.");
-		return -EACCES;
-	}
-	return bt_gatt_notify(NULL, &soil_moisture_service.attrs[6],
-			      &soil_value,
-			      sizeof(soil_value));
-}
-
-
-
-int ble_init(struct application_api * api) {
+int ble_init(application_api_t * api) {
     LOG_INF("BLE initializing.");
    
     int err = is_pointer_null(api);
     if (err != ERROR_OK) {
         LOG_ERR("application_api is NULL.");
-        return err;
-    }
-
-    err = is_pointer_null(api->app_calibrate);
-    if (err != ERROR_OK) {
-        LOG_ERR("api->app_calibrate is NULL.");
-        return err;
-    }
-    err = is_pointer_null(api->app_get_sleep_time);
-    if (err != ERROR_OK) {
-        LOG_ERR("api->app_get_sleep_time is NULL.");
-        return err;
-    }
-    err = is_pointer_null(api->app_set_sleep_time);
-    if (err != ERROR_OK) {
-        LOG_ERR("api->app_set_sleep_time is NULL.");
         return err;
     }
     err = is_pointer_null(api->app_connected);
@@ -324,9 +241,7 @@ int ble_init(struct application_api * api) {
         return err;
     }
 
-    application.app_calibrate = api->app_calibrate;
-    application.app_get_sleep_time = api->app_get_sleep_time;
-    application.app_set_sleep_time = api->app_set_sleep_time;
+
     application.app_connected = api->app_connected;
     application.app_disconnected = api->app_disconnected;
 
@@ -336,6 +251,8 @@ int ble_init(struct application_api * api) {
 K_SEM_DEFINE(avetising_sem, 1, 1);
 
 int ble_advertise_connection_start() {
+	int err = bt_le_adv_stop();
+
 	if (k_sem_take(&avetising_sem, K_FOREVER) == 0) {
 		LOG_INF("ble: start advetising connection");
 		int err = bt_le_adv_start(adv_param_connection, ad_connection, ARRAY_SIZE(ad_connection),

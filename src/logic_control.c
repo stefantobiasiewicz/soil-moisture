@@ -1,5 +1,6 @@
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "logic_control.h"
 
 /*
@@ -116,7 +117,7 @@ if (calculate_temperature_from_U(U_adc, beta, R_25, U_ref, R_f, &temperature, &R
 float ntc_calcualte_temperatrue(float adc_mv) {
     const float beta = 3950; 
     const float R_25 = 10000;
-    const float U_ref = 3.3; 
+    const float U_ref = 3.264; 
     const float R_f = 10000; 
 
     float temperature = 0, R_ntc, I_ntc, P_ntc;
@@ -132,25 +133,6 @@ float ntc_calcualte_temperatrue(float adc_mv) {
 #define A -452.23
 #define B 2790.2
 
-// Maksymalna wartość zmiennej_0_8
-#define MAX_SENSOR_VALUE 8.0
-
-// Funkcja obliczająca procent na podstawie sensor_value
-double calculate_percentage_from_sensor_value(double sensor_value) {
-    // Sprawdzamy, czy sensor_value mieści się w zakresie, aby uniknąć logarytmu z wartości <= 0
-    if (sensor_value >= B || sensor_value <= (B + A * log(MAX_SENSOR_VALUE))) {
-        printf("Error: Sensor value out of valid range\n");
-        return NAN;
-    }
-
-    // Obliczenie zmienna_0_8 na podstawie sensor_value
-    double zmienna_0_8 = exp(-(sensor_value - B) / A);
-
-    // Mapowanie zmienna_0_8 na zakres 0-100%
-    double percentage = (zmienna_0_8 / MAX_SENSOR_VALUE) * 100;
-
-    return percentage;
-}
 
 /**
  * @return soil moisture in percetage
