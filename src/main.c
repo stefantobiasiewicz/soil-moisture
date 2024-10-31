@@ -31,8 +31,8 @@ soil_moisture_calib_data_t soil_moisture_calib_data = {
 };
 
 deivce_config_t device_config = {
-    .ble_enable = true,
-    .display_enable = false,
+    .ble_enable = false,
+    .display_enable = true,
     .periodic_thread_suspend = true,
 };
 
@@ -75,15 +75,6 @@ void pin_reset_set(bool set) {
     } 
 }
 
-bool pin_busy_read() {
-    return hardware_eink_busy_read() == 1 ? true : false;
-}
-
-eink_1in9_pins_t eink_1in9_pins = {
-    .pin_reset_set = pin_reset_set, 
-    .pin_busy_read = pin_busy_read
-};
-
 
 void app_ble_connected(void) {
 
@@ -100,7 +91,7 @@ application_api_t applciation_api =
 
 
 
-#define BUTTONS_STACK_SIZE 1024
+#define BUTTONS_STACK_SIZE 1024 * 4 // todo decrease stack area
 #define BUTTONS_THREAD_PRIORITY 2
 
 void buttons_thread(void *, void *, void *);
@@ -153,10 +144,12 @@ int main(void)
         hardware_power_up();
         hardware_power_internal_up();
 
-        display_init(&eink_1in9_pins);
-        display_clean();
-    }
+        display_init();
+        //display_clean();
 
+        hardware_power_down();
+        hardware_power_internal_down();   
+    }
 
     buttons_tid = k_thread_create(&buttons_thread_data, buttons_stack_area,
                                  K_THREAD_STACK_SIZEOF(buttons_stack_area),
@@ -224,7 +217,14 @@ void left_click(void) {
     LOG_INF("Left button single click detected.");
 
     hardware_power_up();
-    make_full_measurements();
+    measurments_t measuremet = make_full_measurements();
+
+    if(device_config.display_enable) {
+        hardware_power_internal_up();
+        display_values(0.1 , 0.1);
+        hardware_power_internal_down();
+    }
+
     hardware_power_down();
 }
 

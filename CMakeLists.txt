@@ -16,3 +16,9 @@ target_sources(app PRIVATE src/main.c
 if(CONFIG_BT)
     target_sources(app PRIVATE  src/conectivity/ble.c)   
 endif()
+
+
+add_subdirectory(driver/EPD)
+
+# add_subdirectory(lvgl)
+# target_compile_definitions(main PRIVATE ZEPHYR_BASE)

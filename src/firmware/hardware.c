@@ -20,8 +20,7 @@ static const struct adc_dt_spec adc_vcc_chan = ADC_DT_SPEC_GET_BY_IDX(ZEPHYR_USE
 const struct gpio_dt_spec power_high = GPIO_DT_SPEC_GET(DT_NODELABEL(power_high_out), gpios);
 const struct gpio_dt_spec power_internal = GPIO_DT_SPEC_GET(DT_NODELABEL(power_internal_out), gpios);
 
-const struct gpio_dt_spec eink_rst = GPIO_DT_SPEC_GET(DT_NODELABEL(eink_rst_out), gpios);
-const struct gpio_dt_spec eink_busy = GPIO_DT_SPEC_GET(DT_NODELABEL(eink_busy_in), gpios);
+
 
 const struct pwm_dt_spec generator = PWM_DT_SPEC_GET_BY_NAME(ZEPHYR_USER_NODE, generator);
 
@@ -45,8 +44,6 @@ static const struct pwm_dt_spec pwm_led_g = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_g))
 static const struct pwm_dt_spec pwm_led_b = PWM_DT_SPEC_GET(DT_ALIAS(pwm_led_b));
 
 
-const struct i2c_dt_spec eink_1in9_com = I2C_DT_SPEC_GET(DT_NODELABEL(eink_1in9_com_i2c));
-const struct i2c_dt_spec eink_1in9_data = I2C_DT_SPEC_GET(DT_NODELABEL(eink_1in9_data_i2c));
 
 
 
@@ -80,21 +77,6 @@ void hardware_power_internal_down() {
     LOG_INF("Internal Power DOWN: power_internal set to 0");
 }
 
-void hardware_eink_rst_active() {
-    gpio_pin_set_dt(&eink_rst, 0);
-    LOG_INF("E-Ink Reset ACTIVE: eink_rst set to 0");
-}
-
-void hardware_eink_rst_inactive() {
-    gpio_pin_set_dt(&eink_rst, 1);
-    LOG_INF("E-Ink Reset INACTIVE: eink_rst set to 1");
-}
-
-int hardware_eink_busy_read() {
-    int busy = gpio_pin_get_dt(&eink_busy);
-    LOG_DBG("E-Ink Busy state read: %d", busy);
-    return busy;
-}
 
 
 
@@ -283,30 +265,6 @@ hardware_init_status_t hardware_init(struct hardware_callback_t *callbacks_p) {
         return result;
     }
 
-    result.error = !device_is_ready(eink_rst.port);
-    if (result.error) {
-        LOG_ERR("Gpio for eink rst device not ready");
-        return result;
-    }
-
-    result.error = gpio_pin_configure_dt(&eink_rst, GPIO_OUTPUT);
-    if (result.error < ERROR_OK) {
-        LOG_ERR("Could not setup gpio for eink rst (%d)", result.error);
-        return result;
-    }
-
-    result.error = !device_is_ready(eink_busy.port);
-    if (result.error) {
-        LOG_ERR("Gpio for eink busy device not ready");
-        return result;
-    }
-
-    result.error = gpio_pin_configure_dt(&eink_busy, GPIO_INPUT);
-    if (result.error < ERROR_OK) {
-        LOG_ERR("Could not setup gpio for eink busy (%d)", result.error);
-        return result;
-    }
-
     hardware_power_down();
 
     // ADC channels config
@@ -427,25 +385,12 @@ hardware_init_status_t hardware_init(struct hardware_callback_t *callbacks_p) {
     gpio_add_callback(button_right.port, &button_right_cb_data);
     LOG_INF("Set up button at %s pin %d", button_right.port->name, button_right.pin);
 
-    // I2C devices init
-    result.error = !device_is_ready(eink_1in9_com.bus);
-    if (result.error) {
-        LOG_ERR("I2C bus %s is not ready!", eink_1in9_com.bus->name);
-        return result;
-    }
-
-    result.error = !device_is_ready(eink_1in9_data.bus);
-    if (result.error) {
-        LOG_ERR("I2C bus %s is not ready!", eink_1in9_data.bus->name);
-        return result;
-    }
 
     // Timer init
     // k_timer_init(&pulse_timer, led_pulse_step, led_timer_end);
     hardware_led_off();
 
     // Initial states
-    hardware_eink_rst_inactive();
     hardware_genrator_off();
 
     hardware_power_up();

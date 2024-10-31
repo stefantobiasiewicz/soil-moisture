@@ -7,16 +7,9 @@
 #include "validation.h"
 #include <zephyr/logging/log.h>
 
-typedef void (*pin_reset_set_f)(bool state);
-typedef bool (*pin_busy_read_f)(void);
+#define CONFIG_EPD_2IN13B_V4
 
-typedef struct {
-    pin_reset_set_f pin_reset_set;
-    pin_busy_read_f pin_busy_read;
-} eink_1in9_pins_t;
-
-
-void display_init(eink_1in9_pins_t *eink_1in9_pins);
+void display_init();
 
 void display_power_on();
 void display_values(float temperature, float humidity);
