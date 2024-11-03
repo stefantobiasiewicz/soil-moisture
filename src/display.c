@@ -11,8 +11,6 @@
 #include "lvgl.h"
 
 
-unsigned char gImage_2in13b_V4b[];
-unsigned char gImage_2in13b_V4r[];
 
 struct epd_display_fn_t {
 	void (*epd_init)(void);
@@ -101,6 +99,7 @@ void append_list_element(lv_obj_t * list, const char * text, int value) {
     lv_style_init(&border_style);
     lv_style_set_border_width(&border_style, 1);
     lv_style_set_border_color(&border_style, lv_color_black());
+    lv_style_set_radius(&border_style, 10);
     lv_style_set_pad_all(&border_style, 1); 
 
 
@@ -130,18 +129,22 @@ void lv_example_list_2(void)
     /*Add buttons to the list*/
     append_list_element(list1, "Humidity", 78);
     append_list_element(list1, "Temperature", 23);
+    append_list_element(list1, "aaaa", 23);
+    append_list_element(list1, "ssss", 23);
+    append_list_element(list1, "ostatni?", 23);
 }
 
 void display_values(float temperature, float humidity) {
 
-	// lv_example_list_2();
- 	// lv_task_handler();
-	memset(gImage_2in13b_V4b, 0xff, 4000);
-	memset(gImage_2in13b_V4r, 0xff, 4000);
+lv_example_list_2();
+ 	lv_task_handler();
+    EPD_2IN13B_V4_Display_Buffers();
+	// memset(gImage_2in13b_V4b, 0xff, 4000);
+	// memset(gImage_2in13b_V4r, 0xff, 4000);
 
-	memset(gImage_2in13b_V4b, 0x0f, 1);
-	memset(gImage_2in13b_V4r, 0xf0, 1);
-    epd_display_fn.epd_display_full(gImage_2in13b_V4b, gImage_2in13b_V4r);
+	// memset(gImage_2in13b_V4b, 0x0f, 1);
+	// memset(gImage_2in13b_V4r, 0xf0, 1);
+    // epd_display_fn.epd_display_full(gImage_2in13b_V4b, gImage_2in13b_V4r);
 }
 
 void display_power_off() {
@@ -151,7 +154,4 @@ void display_clean() {
     epd_display_fn.epd_clear();
 }
 
-unsigned char gImage_2in13b_V4b[4000] = {0x00};
-
-unsigned char gImage_2in13b_V4r[4000] = {0x00};
 

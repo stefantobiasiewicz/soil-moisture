@@ -128,12 +128,19 @@ static void EPD_2IN13B_V4_SetCursor(UWORD Xstart, UWORD Ystart)
     EPD_2IN13B_V4_SendData((Ystart >> 8) & 0xFF);
 }
 
+unsigned char gImage_2in13b_V4b[4000] = {0x00};
+unsigned char gImage_2in13b_V4r[4000] = {0x00};
+
+
 /******************************************************************************
 function :	Initialize the e-Paper register
 parameter:
 ******************************************************************************/
 void EPD_2IN13B_V4_Init(void)
 {
+	memset(gImage_2in13b_V4b, 0xff, 4000);
+	memset(gImage_2in13b_V4r, 0xff, 4000);
+
 	EPD_2IN13B_V4_Reset();
 
 	EPD_2IN13B_V4_ReadBusy();   
@@ -229,6 +236,12 @@ void EPD_2IN13B_V4_Sleep(void)
 
 
 
+void EPD_2IN13B_V4_Display_Buffers()
+{
+	EPD_2IN13B_V4_Display(gImage_2in13b_V4b, gImage_2in13b_V4r);
+}
+
+
 /**
  * 
  * test to implement zephyr device driver
@@ -245,23 +258,10 @@ void EPD_2IN13B_V4_Sleep(void)
 #include <zephyr/kernel.h>
 
 
-struct dummy_display_config {
-	uint16_t height;
-	uint16_t width;
-};
-
-struct dummy_display_data {
-	enum display_pixel_format current_pixel_format;
-};
 
 
-// Funkcja inicjalizacji displaya
+
 static int my_display_init(const struct device *dev) {
-    // Kod inicjalizacji twojego wyświetlacza
-
-    struct dummy_display_data *disp_data = dev->data;
-
-	disp_data->current_pixel_format = PIXEL_FORMAT_ARGB_8888;
 
 	return 0;
 }
@@ -271,23 +271,25 @@ static int dummy_display_write(const struct device *dev, const uint16_t x,
 			       const struct display_buffer_descriptor *desc,
 			       const void *buf)
 {
-	const struct dummy_display_config *config = dev->config;
+	// const struct dummy_display_config *config = dev->config;
 
-	__ASSERT(desc->width <= desc->pitch, "Pitch is smaller then width");
-	__ASSERT(desc->pitch <= config->width,
-		"Pitch in descriptor is larger than screen size");
-	__ASSERT(desc->height <= config->height,
-		"Height in descriptor is larger than screen size");
-	__ASSERT(x + desc->pitch <= config->width,
-		 "Writing outside screen boundaries in horizontal direction");
-	__ASSERT(y + desc->height <= config->height,
-		 "Writing outside screen boundaries in vertical direction");
+	// __ASSERT(desc->width <= desc->pitch, "Pitch is smaller then width");
+	// __ASSERT(desc->pitch <= config->width,
+	// 	"Pitch in descriptor is larger than screen size");
+	// __ASSERT(desc->height <= config->height,
+	// 	"Height in descriptor is larger than screen size");
+	// __ASSERT(x + desc->pitch <= config->width,
+	// 	 "Writing outside screen boundaries in horizontal direction");
+	// __ASSERT(y + desc->height <= config->height,
+	// 	 "Writing outside screen boundaries in vertical direction");
 
-	if (desc->width > desc->pitch ||
-	    x + desc->pitch > config->width ||
-	    y + desc->height > config->height) {
-		return -EINVAL;
+
+	
+	int y_bolck = (desc->width/8) * y;
+	for (int i = 0; i < desc->buf_size; i++) {
+		gImage_2in13b_V4b[y_bolck + i] = *(unsigned char*)&buf[i];
 	}
+
 
 	return 0;
 }
@@ -317,23 +319,17 @@ static int dummy_display_set_contrast(const struct device *dev,
 static void dummy_display_get_capabilities(const struct device *dev,
 		struct display_capabilities *capabilities)
 {
-	const struct dummy_display_config *config = dev->config;
-	struct dummy_display_data *disp_data = dev->data;
-
 	capabilities->x_resolution = EPD_2IN13B_V4_WIDTH;
 	capabilities->y_resolution = EPD_2IN13B_V4_HEIGHT;
-	capabilities->supported_pixel_formats = PIXEL_FORMAT_BGR_565;
-	capabilities->current_pixel_format = PIXEL_FORMAT_BGR_565;
-	capabilities->screen_info = SCREEN_INFO_MONO_VTILED;
+	capabilities->supported_pixel_formats = PIXEL_FORMAT_MONO10;
+	capabilities->current_pixel_format = PIXEL_FORMAT_MONO10;
+	capabilities->screen_info = SCREEN_INFO_EPD | SCREEN_INFO_MONO_MSB_FIRST;
 	capabilities->current_orientation = DISPLAY_ORIENTATION_NORMAL;
 }
 
 static int dummy_display_set_pixel_format(const struct device *dev,
 		const enum display_pixel_format pixel_format)
 {
-	struct dummy_display_data *disp_data = dev->data;
-
-	disp_data->current_pixel_format = pixel_format;
 	return 0;
 }
 

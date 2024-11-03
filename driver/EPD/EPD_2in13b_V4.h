@@ -41,5 +41,6 @@ void EPD_2IN13B_V4_Init(void);
 void EPD_2IN13B_V4_Clear(void);
 void EPD_2IN13B_V4_Display(const UBYTE *blackimage, const UBYTE *ryimage);
 void EPD_2IN13B_V4_Sleep(void);
+void EPD_2IN13B_V4_Display_Buffers(void);
 
 #endif
