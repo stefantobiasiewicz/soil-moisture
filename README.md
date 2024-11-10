@@ -22,3 +22,15 @@ In the extended configuration, **Plant Guard** includes additional sensors:
 ## Hardware
 
 The device is powered by the **Nordic Semiconductor nRF52833** chip, chosen for its low power consumption and efficient BLE capabilities, making it ideal for battery-powered IoT applications.
+
+
+### Some stuff
+Poted plant Icon Licence:
+https://intercom.help/icons8-7fb7577e8170/en/articles/5534926-universal-multimedia-license-agreement-for-icons8
+
+https://icons8.com/
+
+
+
+helpers:
+https://forum.lvgl.io/t/4-gray-scale-2-bits-display-color-settings/11443/2

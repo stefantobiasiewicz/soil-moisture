@@ -20,5 +20,9 @@ endif()
 
 add_subdirectory(driver/EPD)
 
+# Wyklucz oryginalny plik
+set_source_files_properties(${ZEPHYR_BASE}/modules/lvgl/lvgl_display.c,
+                            PROPERTIES HEADER_FILE_ONLY ON)
+
 # add_subdirectory(lvgl)
 # target_compile_definitions(main PRIVATE ZEPHYR_BASE)

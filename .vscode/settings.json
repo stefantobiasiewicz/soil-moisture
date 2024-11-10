@@ -22,7 +22,10 @@
         "math.h": "c",
         "stdlib.h": "c",
         "*.tcc": "c",
-        "cmath": "c"
+        "cmath": "c",
+        "lvgl_display.h": "c",
+        "random": "cpp",
+        "lvgl.h": "c"
     },
     "nrf-connect.debugging.bindings": {
         "${workspaceFolder}/nrf52833-dev": "Launch nrf52833-dev"

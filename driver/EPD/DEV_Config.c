@@ -40,7 +40,7 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(DEV_Config);
 
-#define DT_DRV_COMPAT generic_epd
+#define DT_DRV_COMPAT opencoded_epd
 
 /* SPI */
 static const struct device *epaper_spi;

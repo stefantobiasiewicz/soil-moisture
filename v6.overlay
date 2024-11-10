@@ -45,7 +45,7 @@
     pinctrl-1 = < &spi3_sleep>;
 	pinctrl-names = "default", "sleep";
 	eink: eink@0 {
-        compatible = "generic,epd";
+        compatible = "opencoded,epd";
 		height = <250>;
 		width = <122>;
 		status = "okay";

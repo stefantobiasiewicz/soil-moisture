@@ -114,10 +114,10 @@ if (calculate_temperature_from_U(U_adc, beta, R_25, U_ref, R_f, &temperature, &R
 /**
  * @return value i celcius
  */
-float ntc_calcualte_temperatrue(float adc_mv) {
+float ntc_calcualte_temperatrue(float adc_mv, int vcc_mv) {
     const float beta = 3950; 
     const float R_25 = 10000;
-    const float U_ref = 3.264; 
+    const float U_ref = 3.294; 
     const float R_f = 10000; 
 
     float temperature = 0, R_ntc, I_ntc, P_ntc;
@@ -138,18 +138,18 @@ float ntc_calcualte_temperatrue(float adc_mv) {
  * @return soil moisture in percetage
  */
 float capacitive_sensor_calculate_moisture(uint16_t raw_value, soil_moisture_calib_data_t calibration_data) {
+    // Ograniczenie raw_value do zakresu kalibracji
     if (raw_value < calibration_data.dry_value) {
         raw_value = calibration_data.dry_value;
     } else if (raw_value > calibration_data.wet_value) {
         raw_value = calibration_data.wet_value;
     }
 
+    // Odwrócenie interpolacji liniowej: raw_value z zakresu [wet_value, dry_value] na [100.0, 0.0]
+    float moisture_percentage = 100.0f * (raw_value - calibration_data.wet_value) 
+                                / (float)(calibration_data.dry_value - calibration_data.wet_value);
 
-    // Perform linear interpolation: Map the raw_value from the range [dry_value, wet_value] to [0.0, 100.0]
-    float moisture_percentage = 100.0f * (calibration_data.wet_value - raw_value) 
-                                / (float)(calibration_data.wet_value - calibration_data.dry_value);
-
-
+    // Ograniczenie wyniku do zakresu [0.0, 100.0]
     if (moisture_percentage < 0.0) {
         moisture_percentage = 0.0;
     } else if (moisture_percentage > 100.0) {
@@ -165,7 +165,7 @@ float capacitive_sensor_calculate_moisture(uint16_t raw_value, soil_moisture_cal
  * @return battery in percetage
  */
 float vbat_calculate_battery(uint16_t raw_value) {
-    float v = raw_value / 2000;
+    float v = (float) raw_value / 2000;
 
     if (v >= 1.55)
         return 100.0; //static value
@@ -182,7 +182,7 @@ float vbat_calculate_battery(uint16_t raw_value) {
 /**
  * @return if device should update display/send data
  */
-bool check_parameters_changes(float soil_moisture, float ground_temperature, float battery, uint64_t up_time_ms) {
+bool check_parameters_changes(float soil_moisture, float temperature_ground, float battery, uint64_t up_time_ms) {
 
     return true;
 }

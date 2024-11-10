@@ -41,8 +41,8 @@ typedef struct {
 typedef struct {
     int battery_mv_raw;
     float battery;
-    int temperature_mv_raw;
-    float ground_temperature;
+    int temperature_ground_mv_raw;
+    float temperature_ground;
     int soil_moisture_mv_raw;
     float soil_moisture;
     float lux;

@@ -67,14 +67,6 @@ static struct hardware_callback_t hardware_callbacks = {
 };
 
 
-void pin_reset_set(bool set) {
-    if (set) {
-        hardware_eink_rst_active();   
-    } else {
-        hardware_eink_rst_inactive();
-    } 
-}
-
 
 void app_ble_connected(void) {
 
@@ -221,7 +213,7 @@ void left_click(void) {
 
     if(device_config.display_enable) {
         hardware_power_internal_up();
-        display_values(0.1 , 0.1);
+        display_values(measuremet);
         hardware_power_internal_down();
     }
 
@@ -245,6 +237,11 @@ void left_long_click(void) {
 
 void right_click(void) {
     LOG_INF("Right button single click detected.");
+
+
+    hardware_power_up();
+    measurments_t measuremet = make_full_measurements();
+    hardware_power_down();
 }
 
 void right_long_click(void) {
@@ -347,7 +344,7 @@ void periodic_thread(void *, void *, void *) {
         hardware_power_up();
         measurments_t results = make_full_measurements();
 
-        bool notify = check_parameters_changes(results.soil_moisture, results.ground_temperature, results.battery, k_uptime_get());
+        bool notify = check_parameters_changes(results.soil_moisture, results.temperature_ground, results.battery, k_uptime_get());
 
         if(notify) {
             if(device_config.display_enable) {
@@ -355,7 +352,7 @@ void periodic_thread(void *, void *, void *) {
                     hardware_power_internal_up();
 
                     display_power_on();
-                    display_values(results.ground_temperature, results.soil_moisture);
+                    display_values(results);
 
                     k_msleep(100);
                     
@@ -384,8 +381,8 @@ void periodic_thread(void *, void *, void *) {
  */
 measurments_t make_short_measurements(void) {
     measurments_t result = {0};
-    result.temperature_mv_raw = hardware_read_adc_mv_tempNTC();
-    LOG_INF("Temperature raw (mV): %d", result.temperature_mv_raw);
+    result.temperature_ground_mv_raw = hardware_read_adc_mv_tempNTC();
+    LOG_INF("Temperature raw (mV): %d", result.temperature_ground_mv_raw);
 
     hardware_genrator_on();
     k_msleep(100);
@@ -402,18 +399,22 @@ measurments_t make_short_measurements(void) {
  * @note Function need voltae high (3v3) pull up
  */
 measurments_t make_full_measurements(void) {
-    measurments_t result = {0};
+    measurments_t result;
  
-    k_msleep(20);
+    k_msleep(500);
 
     result.battery_mv_raw = hardware_read_adc_mv_battery();
     result.battery = vbat_calculate_battery(result.battery_mv_raw);
     LOG_INF("Battery raw (mV): %d, Calculated battery: %.2f", result.battery_mv_raw, result.battery);
     k_msleep(20);
 
-    result.temperature_mv_raw = hardware_read_adc_mv_tempNTC();
-    result.ground_temperature = ntc_calcualte_temperatrue(result.temperature_mv_raw);
-    LOG_INF("Temperature raw (mV): %d, Calculated temperature: %.2f", result.temperature_mv_raw, result.ground_temperature);
+    int vcc_mv = hardware_read_adc_mv_vcc();
+    LOG_INF("VCC raw (mV): %d", vcc_mv);
+    k_msleep(20);
+
+    result.temperature_ground_mv_raw = hardware_read_adc_mv_tempNTC();
+    result.temperature_ground = ntc_calcualte_temperatrue(result.temperature_ground_mv_raw, vcc_mv);
+    LOG_INF("Temperature raw (mV): %d, Calculated temperature: %.2f", result.temperature_ground_mv_raw, result.temperature_ground);
     k_msleep(20);
 
     hardware_genrator_on();
@@ -475,4 +476,33 @@ measurments_t make_full_measurements(void) {
     }
 
     hardware_power_internal_down();
+
+    return result;
 }
+
+
+
+// #include <zboss_api.h>
+// #include <zigbee/zigbee_error_handler.h>
+// #include <zigbee/zigbee_app_utils.h>
+// /**@brief Zigbee stack event handler.
+//  *
+//  * @param[in]   bufid   Reference to the Zigbee stack buffer
+//  *                      used to pass signal.
+//  */
+// void zboss_signal_handler(zb_bufid_t bufid)
+// {
+// 	/* Update network status LED. */
+
+// 	/* No application-specific behavior is required.
+// 	 * Call default signal handler.
+// 	 */
+// 	ZB_ERROR_CHECK(zigbee_default_signal_handler(bufid));
+
+// 	/* All callbacks should either reuse or free passed buffers.
+// 	 * If bufid == 0, the buffer is invalid (not passed).
+// 	 */
+// 	if (bufid) {
+// 		zb_buf_free(bufid);
+// 	}
+// }

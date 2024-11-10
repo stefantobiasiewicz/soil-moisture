@@ -6,13 +6,14 @@
 #include "firmware/hardware.h"
 #include "validation.h"
 #include <zephyr/logging/log.h>
+#include "main.h"
 
 #define CONFIG_EPD_2IN13B_V4
 
 void display_init();
 
 void display_power_on();
-void display_values(float temperature, float humidity);
+void display_values(measurments_t measuremet);
 void display_power_off();
 void display_clean();
 

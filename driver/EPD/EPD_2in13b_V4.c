@@ -91,8 +91,25 @@ void EPD_2IN13B_V4_ReadBusy(void)
 function :	Turn On Display
 parameter:
 ******************************************************************************/
-static void EPD_2IN13B_V4_TurnOnDisplay(void)
+
+static void EPD_2IN13_V4_TurnOnDisplay(void)
 {
+	EPD_2IN13B_V4_SendCommand(0x20); // Activate Display Update Sequence
+	EPD_2IN13B_V4_ReadBusy();
+}
+
+static void EPD_2IN13_V4_TurnOnDisplay_Fast(void)
+{
+	EPD_2IN13B_V4_SendCommand(0x22); // Display Update Control
+	EPD_2IN13B_V4_SendData(0xc7);	// fast:0x0c, quality:0x0f, 0xcf
+	EPD_2IN13B_V4_SendCommand(0x20); // Activate Display Update Sequence
+	EPD_2IN13B_V4_ReadBusy();
+}
+
+static void EPD_2IN13_V4_TurnOnDisplay_Partial(void)
+{
+	EPD_2IN13B_V4_SendCommand(0x22); // Display Update Control
+	EPD_2IN13B_V4_SendData(0xff);	// fast:0x0c, quality:0x0f, 0xcf
 	EPD_2IN13B_V4_SendCommand(0x20); // Activate Display Update Sequence
 	EPD_2IN13B_V4_ReadBusy();
 }
@@ -128,9 +145,6 @@ static void EPD_2IN13B_V4_SetCursor(UWORD Xstart, UWORD Ystart)
     EPD_2IN13B_V4_SendData((Ystart >> 8) & 0xFF);
 }
 
-unsigned char gImage_2in13b_V4b[4000] = {0x00};
-unsigned char gImage_2in13b_V4r[4000] = {0x00};
-
 
 /******************************************************************************
 function :	Initialize the e-Paper register
@@ -138,9 +152,6 @@ parameter:
 ******************************************************************************/
 void EPD_2IN13B_V4_Init(void)
 {
-	memset(gImage_2in13b_V4b, 0xff, 4000);
-	memset(gImage_2in13b_V4r, 0xff, 4000);
-
 	EPD_2IN13B_V4_Reset();
 
 	EPD_2IN13B_V4_ReadBusy();   
@@ -194,7 +205,7 @@ void EPD_2IN13B_V4_Clear(void)
             EPD_2IN13B_V4_SendData(0XFF);
         }
     }
-	EPD_2IN13B_V4_TurnOnDisplay();
+	EPD_2IN13_V4_TurnOnDisplay();
 }
 
 /******************************************************************************
@@ -219,7 +230,7 @@ void EPD_2IN13B_V4_Display(const UBYTE *blackImage, const UBYTE *redImage)
             EPD_2IN13B_V4_SendData(redImage[i + j * Width]);
         }
     }	
-	EPD_2IN13B_V4_TurnOnDisplay();	
+	EPD_2IN13_V4_TurnOnDisplay();	
 }
 
 /******************************************************************************
@@ -234,12 +245,6 @@ void EPD_2IN13B_V4_Sleep(void)
 }
 
 
-
-
-void EPD_2IN13B_V4_Display_Buffers()
-{
-	EPD_2IN13B_V4_Display(gImage_2in13b_V4b, gImage_2in13b_V4r);
-}
 
 
 /**
@@ -258,10 +263,14 @@ void EPD_2IN13B_V4_Display_Buffers()
 #include <zephyr/kernel.h>
 
 
+unsigned char gImage_2in13b_V4b[4000] = {0x00};
+unsigned char gImage_2in13b_V4r[4000] = {0x00};
 
 
 
 static int my_display_init(const struct device *dev) {
+	memset(gImage_2in13b_V4b, 0xff, 4000);
+	memset(gImage_2in13b_V4r, 0xff, 4000);
 
 	return 0;
 }
@@ -285,9 +294,33 @@ static int dummy_display_write(const struct device *dev, const uint16_t x,
 
 
 	
-	int y_bolck = (desc->width/8) * y;
+	// int y_bolck = (desc->width/8) * y;
+	// for (int i = 0; i < desc->buf_size; i++) {
+	// 	gImage_2in13b_V4b[y_bolck + i] = *(unsigned char*)&buf[i];
+	// }
+
+	int base_index = (desc->width/8) * y - 1;	
 	for (int i = 0; i < desc->buf_size; i++) {
-		gImage_2in13b_V4b[y_bolck + i] = *(unsigned char*)&buf[i];
+		uint8_t px = *(uint8_t*)&buf[i];
+		uint8_t px_bit = i % 8;
+
+		if(px_bit == 0) {
+			base_index ++;
+		}
+		if(px == 0x01) {
+			// set black
+			gImage_2in13b_V4b[base_index] &= ~BIT(7 -px_bit);
+			gImage_2in13b_V4r[base_index] |= BIT(7 -px_bit);
+		} else if (px == 0x02) {
+			// set red
+			gImage_2in13b_V4r[base_index] &= ~BIT(7 -px_bit);
+			gImage_2in13b_V4b[base_index] |= BIT(7 -px_bit);
+
+		} else {
+			//set white
+			gImage_2in13b_V4b[base_index] |= BIT(7 - px_bit);
+			gImage_2in13b_V4r[base_index] |= BIT(7 -px_bit);	
+		}
 	}
 
 
@@ -295,7 +328,11 @@ static int dummy_display_write(const struct device *dev, const uint16_t x,
 }
 
 static int dummy_display_blanking_off(const struct device *dev)
-{
+{    
+	/**
+	 * function blanking off is call on end of zephyr-lvgl flush method when screen_info contain 'SCREEN_INFO_EPD' 
+	 */
+	EPD_2IN13B_V4_Display(gImage_2in13b_V4b, gImage_2in13b_V4r);
 	return 0;
 }
 
@@ -321,8 +358,8 @@ static void dummy_display_get_capabilities(const struct device *dev,
 {
 	capabilities->x_resolution = EPD_2IN13B_V4_WIDTH;
 	capabilities->y_resolution = EPD_2IN13B_V4_HEIGHT;
-	capabilities->supported_pixel_formats = PIXEL_FORMAT_MONO10;
-	capabilities->current_pixel_format = PIXEL_FORMAT_MONO10;
+	capabilities->supported_pixel_formats = PIXEL_FORMAT_RGB_565;
+	capabilities->current_pixel_format = PIXEL_FORMAT_RGB_565;
 	capabilities->screen_info = SCREEN_INFO_EPD | SCREEN_INFO_MONO_MSB_FIRST;
 	capabilities->current_orientation = DISPLAY_ORIENTATION_NORMAL;
 }
@@ -346,4 +383,4 @@ static const struct display_driver_api my_display_api = {
 #define EINK_DEFINE(node_id)                                                                   \
 	DEVICE_DT_DEFINE(node_id, my_display_init, NULL, NULL, NULL, POST_KERNEL, CONFIG_DISPLAY_INIT_PRIORITY, &my_display_api);
 
-DT_FOREACH_STATUS_OKAY(generic_epd, EINK_DEFINE)
+DT_FOREACH_STATUS_OKAY(opencoded_epd, EINK_DEFINE)

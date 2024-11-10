@@ -6,7 +6,7 @@ description: |
 
 include: [spi-device.yaml, display-controller.yaml]
 
-compatible: "generic,epd"
+compatible: "opencoded,epd"
 
 properties:
     vcc-gpios:
