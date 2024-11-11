@@ -13,9 +13,8 @@ target_sources(app PRIVATE src/main.c
                 src/logic_control.c
             )
 
-if(CONFIG_BT)
-    target_sources(app PRIVATE  src/conectivity/ble.c)   
-endif()
+            
+target_sources(app PRIVATE  src/conectivity/ble.c)   
 
 
 add_subdirectory(driver/EPD)

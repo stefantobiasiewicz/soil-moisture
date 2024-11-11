@@ -11,10 +11,11 @@
 #define CONFIG_EPD_2IN13B_V4
 
 void display_init();
+void display_exit_low_power();
 
-void display_power_on();
 void display_values(measurments_t measuremet);
-void display_power_off();
 void display_clean();
+
+
 
 #endif

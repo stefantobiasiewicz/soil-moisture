@@ -333,11 +333,16 @@ static int dummy_display_blanking_off(const struct device *dev)
 	 * function blanking off is call on end of zephyr-lvgl flush method when screen_info contain 'SCREEN_INFO_EPD' 
 	 */
 	EPD_2IN13B_V4_Display(gImage_2in13b_V4b, gImage_2in13b_V4r);
+
+	EPD_2IN13B_V4_Sleep();
+	DEV_Module_Exit();
 	return 0;
 }
 
 static int dummy_display_blanking_on(const struct device *dev)
 {
+	DEV_Module_Init();
+	EPD_2IN13B_V4_Init();
 	return 0;
 }
 

@@ -31,9 +31,9 @@ soil_moisture_calib_data_t soil_moisture_calib_data = {
 };
 
 deivce_config_t device_config = {
-    .ble_enable = false,
+    .ble_enable = true,
     .display_enable = true,
-    .periodic_thread_suspend = true,
+    .periodic_thread_suspend = false,
 };
 
 
@@ -67,12 +67,12 @@ static struct hardware_callback_t hardware_callbacks = {
 };
 
 
-
+bool ble_connected = false;
 void app_ble_connected(void) {
-
+    ble_connected = true;
 }
 void app_ble_disconnected(void) {
-
+    ble_connected = false;
 }
 
 application_api_t applciation_api =
@@ -83,7 +83,7 @@ application_api_t applciation_api =
 
 
 
-#define BUTTONS_STACK_SIZE 1024 * 4 // todo decrease stack area
+#define BUTTONS_STACK_SIZE 1024
 #define BUTTONS_THREAD_PRIORITY 2
 
 void buttons_thread(void *, void *, void *);
@@ -92,7 +92,7 @@ K_THREAD_STACK_DEFINE(buttons_stack_area, BUTTONS_STACK_SIZE);
 struct k_thread buttons_thread_data;
 k_tid_t buttons_tid;
 
-#define PERIODIC_STACK_SIZE 1024
+#define PERIODIC_STACK_SIZE 1024 * 4
 #define PERIODIC_THREAD_PRIORITY 2
 
 void periodic_thread(void *, void *, void *);
@@ -103,10 +103,19 @@ k_tid_t periodic_tid;
 
 k_tid_t main_tid;
 
+
+enum {
+    BUTTON_EVENT_BLE_CONNECTION     = 0x00,
+    BUTTON_EVENT_MAKE_MEASUREMENTS  = 0x01,
+    BUTTON_EVENT_MAKE_MEASUREMENTS_AND_UPDATE_DISPLAY,
+    BUTTON_EVENT_MAKE_MEASUREMENTS_AND_BLE
+};
+typedef uint8_t lv_part_t;
+
 typedef struct {
-    uint16_t type;
+    lv_part_t type;
 } button_msgq_item_t;
-K_MSGQ_DEFINE(button_msgq, sizeof(button_msgq_item_t), 5, 1);
+K_MSGQ_DEFINE(button_msgq, sizeof(button_msgq_item_t), 1, 1);
 
 
 int main(void)
@@ -121,6 +130,8 @@ int main(void)
 	if (init_status.error != ERROR_OK) {
 		error();
 	}
+
+
 
     device_config.hardware_init_status = init_status;
 
@@ -137,11 +148,19 @@ int main(void)
         hardware_power_internal_up();
 
         display_init();
-        //display_clean();
+        display_exit_low_power();
 
         hardware_power_down();
         hardware_power_internal_down();   
     }
+
+
+    // hardware_power_down();
+    // hardware_power_internal_down();  
+    // while(1) {
+    //     k_msleep(20); 
+    //     k_cpu_idle();
+    // }
 
     buttons_tid = k_thread_create(&buttons_thread_data, buttons_stack_area,
                                  K_THREAD_STACK_SIZEOF(buttons_stack_area),
@@ -166,8 +185,10 @@ int main(void)
         
         button_msgq_item_t data;
         if (k_msgq_get(&button_msgq, &data, K_NO_WAIT) == 0) {
-            if (data.type == 1) {
+            if (data.type == BUTTON_EVENT_BLE_CONNECTION) {
                 if(device_config.ble_enable) {
+                    hardware_power_up();
+
                     hardware_set_led_color(0,0,255);
                     ble_advertise_connection_start();
                     // led blue pulsing
@@ -175,7 +196,44 @@ int main(void)
                     //connection end
                     ble_advertise_connection_stop();
                     hardware_led_off();
+
+                    hardware_power_down();
                 }
+            }
+            if (data.type == BUTTON_EVENT_MAKE_MEASUREMENTS) {
+                hardware_power_up();
+                measurments_t measuremet = make_full_measurements();
+                hardware_power_down();
+            }
+            if (data.type == BUTTON_EVENT_MAKE_MEASUREMENTS_AND_BLE) {
+                hardware_power_up();
+                measurments_t measuremet = make_full_measurements();
+                if(device_config.ble_enable) {
+                    if (ble_connected == false) {
+                        hardware_set_led_color(0,0,255);
+
+                        ble_advertise_not_connection_data_start(measuremet);
+                        k_msleep(5000);
+                        ble_advertise_not_connection_data_stop();   
+
+                        hardware_led_off();
+                    } else {
+                        LOG_INF("measuremnt data not advertised, ble state connected");
+                    }
+                }
+                hardware_power_down();
+            }
+            if (data.type == BUTTON_EVENT_MAKE_MEASUREMENTS_AND_UPDATE_DISPLAY) {        
+                hardware_power_up();
+                measurments_t measuremet = make_full_measurements();
+
+                if(device_config.display_enable) {
+                    hardware_power_internal_up();
+                    display_values(measuremet);
+                    hardware_power_internal_down();
+                }
+
+                hardware_power_down();
             }
         }
 
@@ -208,16 +266,16 @@ void app_right_button_press() {
 void left_click(void) {
     LOG_INF("Left button single click detected.");
 
-    hardware_power_up();
-    measurments_t measuremet = make_full_measurements();
-
-    if(device_config.display_enable) {
-        hardware_power_internal_up();
-        display_values(measuremet);
-        hardware_power_internal_down();
+    //put to queue
+    button_msgq_item_t data = {
+        .type = BUTTON_EVENT_MAKE_MEASUREMENTS_AND_UPDATE_DISPLAY,
+    };
+    while (k_msgq_put(&button_msgq, &data, K_NO_WAIT) != 0) {
+        /* message queue is full: purge old data & try again */
+        k_msgq_purge(&button_msgq);
     }
 
-    hardware_power_down();
+    k_thread_resume(main_tid); 
 }
 
 void left_long_click(void) {
@@ -225,7 +283,7 @@ void left_long_click(void) {
     
     //put to queue
     button_msgq_item_t data = {
-        .type = 1,
+        .type = BUTTON_EVENT_BLE_CONNECTION,
     };
     while (k_msgq_put(&button_msgq, &data, K_NO_WAIT) != 0) {
         /* message queue is full: purge old data & try again */
@@ -238,14 +296,32 @@ void left_long_click(void) {
 void right_click(void) {
     LOG_INF("Right button single click detected.");
 
+    //put to queue
+    button_msgq_item_t data = {
+        .type = BUTTON_EVENT_MAKE_MEASUREMENTS_AND_BLE,
+    };
+    while (k_msgq_put(&button_msgq, &data, K_NO_WAIT) != 0) {
+        /* message queue is full: purge old data & try again */
+        k_msgq_purge(&button_msgq);
+    }
 
-    hardware_power_up();
-    measurments_t measuremet = make_full_measurements();
-    hardware_power_down();
+    k_thread_resume(main_tid); 
 }
 
 void right_long_click(void) {
     LOG_INF("Right button long click detected.");
+
+
+    //put to queue
+    button_msgq_item_t data = {
+        .type = BUTTON_EVENT_MAKE_MEASUREMENTS,
+    };
+    while (k_msgq_put(&button_msgq, &data, K_NO_WAIT) != 0) {
+        /* message queue is full: purge old data & try again */
+        k_msgq_purge(&button_msgq);
+    }
+
+    k_thread_resume(main_tid); 
 }
 
 void buttons_thread(void *, void *, void *) {
@@ -329,18 +405,6 @@ void periodic_thread(void *, void *, void *) {
 
         LOG_INF("Periodic measurments and data sharing.");
 
-        /*
-            power up
-            battery
-            temperature 
-            soil 
-
-            check if need to update display
-                display
-            check if need to publish by ble
-                publish
-        */
-       
         hardware_power_up();
         measurments_t results = make_full_measurements();
 
@@ -351,9 +415,7 @@ void periodic_thread(void *, void *, void *) {
                 if (true) {
                     hardware_power_internal_up();
 
-                    display_power_on();
                     display_values(results);
-
                     k_msleep(100);
                     
                     hardware_power_internal_down();
@@ -361,9 +423,17 @@ void periodic_thread(void *, void *, void *) {
             }
 
             if(device_config.ble_enable) {
-                // ble_advertise_not_connection_data_start(...);
-                // k_msleep(10000);
-                // ble_advertise_not_connection_data_stop();    
+                if (ble_connected == false) {
+                    hardware_set_led_color(0,0,255);
+
+                    ble_advertise_not_connection_data_start(results);
+                    k_msleep(5000);
+                    ble_advertise_not_connection_data_stop();   
+
+                    hardware_led_off();
+                } else {
+                    LOG_INF("measuremnt data not advertised, ble state connected");
+                }
             }
         }
 

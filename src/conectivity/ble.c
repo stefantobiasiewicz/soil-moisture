@@ -7,10 +7,14 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/random/random.h>
 #include "../validation.h"
 
-
 LOG_MODULE_REGISTER(ble, LOG_LEVEL_DBG);
+
+#ifdef CONFIG_BT
+
+
 
 #define APP_VERSION 0x0005
 
@@ -79,14 +83,23 @@ typedef struct adv_mfg_data {
 static manufacture_data_t adv_mfg_data = {0x0005, 0x0000, 0x0000, 0x0000};
 
 typedef struct {
-	uint16_t uuid;	
+	uint16_t uuid;
+
 	uint16_t version;
-	uint16_t ble_soil_moisture_value;
-	uint16_t ble_battery_value;
+    uint16_t battery_mv_raw;
+    uint16_t battery;
+    uint16_t temperature_ground_mv_raw;
+    uint16_t temperature_ground;
+    uint16_t soil_moisture_mv_raw;
+    uint16_t soil_moisture;
+    uint16_t lux;
+    uint16_t air_temperature;
+    uint16_t air_humidity;
+
 	uint16_t unique_id;
 } service_data_t;
 
-static service_data_t service_data = {0x55aa, 0x0006, 0x0001, 0x0003, 0x0005};
+static service_data_t service_data = {0x0600,}; // set uuid in first 2 bytes
 
 
 
@@ -103,7 +116,7 @@ static const struct bt_data ad_connection[] = {
 static const struct bt_data ad_data[] = {
 	/* STEP 4.1.2 - Set the advertising flags */    
     BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
-	BT_DATA(BT_DATA_MANUFACTURER_DATA, &adv_mfg_data, sizeof(adv_mfg_data)),
+	// BT_DATA(BT_DATA_MANUFACTURER_DATA, &adv_mfg_data, sizeof(adv_mfg_data)),
 	BT_DATA(BT_DATA_SVC_DATA16, &service_data, sizeof(service_data)),
 };
 
@@ -276,11 +289,18 @@ int ble_advertise_connection_stop() {
 }
 
 
-int ble_advertise_not_connection_data_start(measure_data_t data, uint16_t id) {
-	LOG_INF("ble: setting battery value: [%d] and soil value: [%d] and unique_id: [%d].", data.battery_value, data.soil_value, id);
-	adv_mfg_data.ble_battery_value = data.battery_value;
-	adv_mfg_data.ble_soil_moisture_value = data.soil_value;
-	adv_mfg_data.unique_id = id;
+int ble_advertise_not_connection_data_start(measurments_t data) {
+    service_data.battery_mv_raw = data.battery_mv_raw;
+    service_data.battery = (uint16_t) (data.battery * 10);
+    service_data.temperature_ground_mv_raw = data.battery_mv_raw;
+    service_data.temperature_ground = (uint16_t) (data.temperature_ground * 10);
+    service_data.soil_moisture_mv_raw = data.soil_moisture_mv_raw;
+    service_data.soil_moisture = (uint16_t) (data.soil_moisture * 10);
+    service_data.lux = (uint16_t) (data.lux);
+    service_data.air_temperature = (uint16_t) (data.air_temperature * 10);
+    service_data.air_humidity = (uint16_t) (data.air_humidity * 10);
+
+	service_data.unique_id = sys_rand16_get();
 
 	if (k_sem_take(&avetising_sem, K_FOREVER) == 0) {
 		LOG_INF("ble: start advetising soil data");
@@ -304,3 +324,4 @@ int ble_advertise_not_connection_data_stop() {
 	return err;
 }
 
+#endif

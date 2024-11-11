@@ -619,7 +619,8 @@ void display_values(measurments_t measuremet)
   lv_task_handler();
 }
 
-void display_clean()
+
+void display_exit_low_power()
 {
-  epd_display_fn.epd_clear();
+  DEV_Module_Exit();
 }

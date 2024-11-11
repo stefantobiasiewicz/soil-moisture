@@ -36,7 +36,7 @@ typedef struct
     app_disconnected_t app_disconnected;
 } application_api_t;
 
-
+#ifdef CONFIG_BT
 int ble_init(application_api_t * api);
 
 /**
@@ -48,12 +48,55 @@ int ble_advertise_connection_stop();
 /**
  * advertising soil and battery data
 */
-int ble_advertise_not_connection_data_start(measure_data_t data, uint16_t id);
+int ble_advertise_not_connection_data_start(measurments_t data);
 int ble_advertise_not_connection_data_stop();
 
 /**
  * notifiing soil and battery data when connection
 */
 int ble_send_notify(uint16_t soil_value, uint16_t battery_value);
+#endif
+
+
+#ifndef CONFIG_BT
+int ble_init(application_api_t * api){
+	LOG_WRN("BLE is not builded into image set 'CONFIG_BT' to enable it.");
+	return 0;
+}
+
+/**
+ * advetising for connection and setup parameters
+*/
+int ble_advertise_connection_start() {
+	LOG_WRN("BLE is not builded into image set 'CONFIG_BT' to enable it.");
+	return 0;
+}
+int ble_advertise_connection_stop() {
+	LOG_WRN("BLE is not builded into image set 'CONFIG_BT' to enable it.");
+	return 0;
+}
+
+/**
+ * advertising soil and battery data
+*/
+int ble_advertise_not_connection_data_start(measure_data_t data, uint16_t id){
+	LOG_WRN("BLE is not builded into image set 'CONFIG_BT' to enable it.");
+	return 0;
+}
+
+int ble_advertise_not_connection_data_stop() {
+	LOG_WRN("BLE is not builded into image set 'CONFIG_BT' to enable it.");
+	return 0;
+}
+
+/**
+ * notifiing soil and battery data when connection
+*/
+int ble_send_notify(uint16_t soil_value, uint16_t battery_value) {
+	LOG_WRN("BLE is not builded into image set 'CONFIG_BT' to enable it.");
+	return 0;
+}
+#endif
+
 
 #endif

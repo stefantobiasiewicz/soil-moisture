@@ -174,6 +174,26 @@ void DEV_GPIO_Init(void)
  * parameter:
  * Info:
  *****************************************************************************/
+
+enum pm_device_action {
+	/** Suspend. */
+	PM_DEVICE_ACTION_SUSPEND,
+	/** Resume. */
+	PM_DEVICE_ACTION_RESUME,
+	/**
+	 * Turn off.
+	 * @note
+	 *     Action triggered only by a power domain.
+	 */
+	PM_DEVICE_ACTION_TURN_OFF,
+	/**
+	 * Turn on.
+	 * @note
+	 *     Action triggered only by a power domain.
+	 */
+	PM_DEVICE_ACTION_TURN_ON,
+};
+
 UBYTE DEV_Module_Init(void)
 {
 	printk("/***********************************/init \r\n");
@@ -182,7 +202,14 @@ UBYTE DEV_Module_Init(void)
 	DEV_GPIO_Init();
 	/* Hardcoded for now, make sure 4in2 v1 working then get pin from devicetree */
 
+	/**
+	 * Magic for low power consumption... 
+	 * in exit function sck pin form spi need to be unplugged/unconifured and in next 
+	 * run need to be configured into SPI 
+	 */
 	epaper_spi = DEVICE_DT_GET(DT_PARENT(DT_DRV_INST(0)));
+	pm_device_action_run(epaper_spi, PM_DEVICE_ACTION_RESUME);
+	
 	printk("epaper_spi %p \r\n", epaper_spi);
 
 	if (!epaper_spi) {
@@ -205,15 +232,50 @@ UBYTE DEV_Module_Init(void)
  * parameter:
  * Info:
  *****************************************************************************/
+#include <nrfx_spim.h>
+#include "nrfx_gpiote.h"
+struct spi_nrfx_config {
+	nrfx_spim_t	   spim;
+	uint32_t	   max_freq;
+	nrfx_spim_config_t def_config;
+	void (*irq_connect)(void);
+	uint16_t max_chunk_len;
+	const struct pinctrl_dev_config *pcfg;
+#ifdef CONFIG_SOC_NRF52832_ALLOW_SPIM_DESPITE_PAN_58
+	bool anomaly_58_workaround;
+#endif
+	uint32_t wake_pin;
+	nrfx_gpiote_t wake_gpiote;
+#ifdef CONFIG_DCACHE
+	uint32_t mem_attr;
+#endif
+};
+
+
+
 void DEV_Module_Exit(void)
 {
-	DEV_Digital_Write(EPD_CS_PIN, LOW);
+	DEV_Digital_Write(EPD_CS_PIN, HIGH);
 	if (PWR_PIN.gpio.port) {
 		DEV_Digital_Write(EPD_PWR_PIN, LOW);
 	}
 
 	DEV_Digital_Write(EPD_DC_PIN, LOW);
 	DEV_Digital_Write(EPD_RST_PIN, LOW);
+
+	/**
+	 * Magic to reduce power consumtion. SCK pin need to be unpinned because stay pull up and 
+	 * EPD display take ~1mA of current. 
+	 */
+	epaper_spi = DEVICE_DT_GET(DT_PARENT(DT_DRV_INST(0)));
+
+	const struct spi_nrfx_config *dev_config = epaper_spi->config;
+    nrfy_spim_pins_t spi_pins;
+    nrfy_spim_pins_get((&dev_config->spim)->p_reg, &spi_pins);
+
+	pm_device_action_run(epaper_spi, PM_DEVICE_ACTION_SUSPEND);// <-- it's not unpin SPI pins because 'nrfx_spim_uninit' skip that part...
+	// manualy uninited SCK pin 
+	nrf_gpio_cfg_default(spi_pins.sck_pin);
 
 	/* SPI end and MCU close. */
 }

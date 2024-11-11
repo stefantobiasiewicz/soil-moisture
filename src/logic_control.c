@@ -192,5 +192,5 @@ bool check_parameters_changes(float soil_moisture, float temperature_ground, flo
  * @return next wake up time for checking parameters base on changes detected by @see check_parameters_changes(...) function
  */
 int get_next_wakeup_time_ms() {
-    return 20000;
+    return 5*60000;
 }
