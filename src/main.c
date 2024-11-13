@@ -192,7 +192,7 @@ int main(void)
                     hardware_set_led_color(0,0,255);
                     ble_advertise_connection_start();
                     // led blue pulsing
-                    k_msleep(5000);
+                    k_msleep(10000);
                     //connection end
                     ble_advertise_connection_stop();
                     hardware_led_off();
@@ -213,7 +213,7 @@ int main(void)
                         hardware_set_led_color(0,0,255);
 
                         ble_advertise_not_connection_data_start(measuremet);
-                        k_msleep(5000);
+                        k_msleep(10000);
                         ble_advertise_not_connection_data_stop();   
 
                         hardware_led_off();
@@ -552,27 +552,31 @@ measurments_t make_full_measurements(void) {
 
 
 
-// #include <zboss_api.h>
-// #include <zigbee/zigbee_error_handler.h>
-// #include <zigbee/zigbee_app_utils.h>
-// /**@brief Zigbee stack event handler.
-//  *
-//  * @param[in]   bufid   Reference to the Zigbee stack buffer
-//  *                      used to pass signal.
-//  */
-// void zboss_signal_handler(zb_bufid_t bufid)
-// {
-// 	/* Update network status LED. */
+#ifdef CONFIG_ZIGBEE
 
-// 	/* No application-specific behavior is required.
-// 	 * Call default signal handler.
-// 	 */
-// 	ZB_ERROR_CHECK(zigbee_default_signal_handler(bufid));
+#include <zboss_api.h>
+#include <zigbee/zigbee_error_handler.h>
+#include <zigbee/zigbee_app_utils.h>
+/**@brief Zigbee stack event handler.
+ *
+ * @param[in]   bufid   Reference to the Zigbee stack buffer
+ *                      used to pass signal.
+ */
+void zboss_signal_handler(zb_bufid_t bufid)
+{
+	/* Update network status LED. */
 
-// 	/* All callbacks should either reuse or free passed buffers.
-// 	 * If bufid == 0, the buffer is invalid (not passed).
-// 	 */
-// 	if (bufid) {
-// 		zb_buf_free(bufid);
-// 	}
-// }
+	/* No application-specific behavior is required.
+	 * Call default signal handler.
+	 */
+	ZB_ERROR_CHECK(zigbee_default_signal_handler(bufid));
+
+	/* All callbacks should either reuse or free passed buffers.
+	 * If bufid == 0, the buffer is invalid (not passed).
+	 */
+	if (bufid) {
+		zb_buf_free(bufid);
+	}
+}
+
+#endif
