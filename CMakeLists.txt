@@ -17,7 +17,14 @@ target_sources(app PRIVATE src/main.c
 target_sources(app PRIVATE  src/conectivity/ble.c)   
 
 
-add_subdirectory(driver/EPD)
+target_sources(app PRIVATE  src/conectivity/zigbee_app.c)   
+target_sources(app PRIVATE  src/conectivity/zb_zcl_soil_moisture_measurements.c)   
+target_sources(app PRIVATE  src/conectivity/zigbee_app_utils_op.c)   
+
+if(CONFIG_DISPLAY)
+    add_subdirectory(driver/EPD)
+endif()
+
 
 # Wyklucz oryginalny plik
 set_source_files_properties(${ZEPHYR_BASE}/modules/lvgl/lvgl_display.c,

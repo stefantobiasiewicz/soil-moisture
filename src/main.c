@@ -15,6 +15,7 @@
 #include "firmware/hardware.h"
 #include "firmware/flash.h"
 #include "conectivity/ble.h"
+#include "conectivity/zigbee_app.h"
 
 #include "display.h"
 #include "logic_control.h"
@@ -31,9 +32,11 @@ soil_moisture_calib_data_t soil_moisture_calib_data = {
 };
 
 deivce_config_t device_config = {
-    .ble_enable = true,
-    .display_enable = true,
+    .ble_enable = false,
+    .display_enable = false,
     .periodic_thread_suspend = false,
+    .periodic_thread_fast = true,
+    .zibee_enable = true,
 };
 
 
@@ -108,12 +111,13 @@ enum {
     BUTTON_EVENT_BLE_CONNECTION     = 0x00,
     BUTTON_EVENT_MAKE_MEASUREMENTS  = 0x01,
     BUTTON_EVENT_MAKE_MEASUREMENTS_AND_UPDATE_DISPLAY,
-    BUTTON_EVENT_MAKE_MEASUREMENTS_AND_BLE
+    BUTTON_EVENT_MAKE_MEASUREMENTS_AND_BLE,
+    BUTTON_EVENT_ZIGBEE_FACTORY_RESET,
 };
-typedef uint8_t lv_part_t;
+typedef uint8_t main_thread_event_t;
 
 typedef struct {
-    lv_part_t type;
+    main_thread_event_t type;
 } button_msgq_item_t;
 K_MSGQ_DEFINE(button_msgq, sizeof(button_msgq_item_t), 1, 1);
 
@@ -155,12 +159,14 @@ int main(void)
     }
 
 
-    // hardware_power_down();
-    // hardware_power_internal_down();  
-    // while(1) {
-    //     k_msleep(20); 
-    //     k_cpu_idle();
-    // }
+    hardware_power_down();
+    hardware_power_internal_down();  
+
+    if (device_config.zibee_enable) {
+        zigbee_app_init();
+        zigbee_app_start();
+    }
+
 
     buttons_tid = k_thread_create(&buttons_thread_data, buttons_stack_area,
                                  K_THREAD_STACK_SIZEOF(buttons_stack_area),
@@ -205,6 +211,9 @@ int main(void)
                 measurments_t measuremet = make_full_measurements();
                 hardware_power_down();
             }
+            if (data.type == BUTTON_EVENT_ZIGBEE_FACTORY_RESET) {
+                zigbee_app_factory_reset();
+            }
             if (data.type == BUTTON_EVENT_MAKE_MEASUREMENTS_AND_BLE) {
                 hardware_power_up();
                 measurments_t measuremet = make_full_measurements();
@@ -221,6 +230,8 @@ int main(void)
                         LOG_INF("measuremnt data not advertised, ble state connected");
                     }
                 }
+
+                zigbee_app_update(measuremet);
                 hardware_power_down();
             }
             if (data.type == BUTTON_EVENT_MAKE_MEASUREMENTS_AND_UPDATE_DISPLAY) {        
@@ -262,13 +273,11 @@ void app_right_button_press() {
 
 #define LONG_CLICK_THRESHOLD_MS 1000
 
+void send_signal_to_main_thread(main_thread_event_t event) {
 
-void left_click(void) {
-    LOG_INF("Left button single click detected.");
-
-    //put to queue
+    //put to queue  
     button_msgq_item_t data = {
-        .type = BUTTON_EVENT_MAKE_MEASUREMENTS_AND_UPDATE_DISPLAY,
+        .type = event,
     };
     while (k_msgq_put(&button_msgq, &data, K_NO_WAIT) != 0) {
         /* message queue is full: purge old data & try again */
@@ -276,52 +285,30 @@ void left_click(void) {
     }
 
     k_thread_resume(main_tid); 
+}
+
+void left_click(void) {
+    LOG_INF("Left button single click detected.");
+
+    send_signal_to_main_thread(BUTTON_EVENT_MAKE_MEASUREMENTS_AND_UPDATE_DISPLAY);
 }
 
 void left_long_click(void) {
     LOG_INF("Left button long click detected.");
     
-    //put to queue
-    button_msgq_item_t data = {
-        .type = BUTTON_EVENT_BLE_CONNECTION,
-    };
-    while (k_msgq_put(&button_msgq, &data, K_NO_WAIT) != 0) {
-        /* message queue is full: purge old data & try again */
-        k_msgq_purge(&button_msgq);
-    }
-
-    k_thread_resume(main_tid);   
+    send_signal_to_main_thread(BUTTON_EVENT_BLE_CONNECTION); 
 }
 
 void right_click(void) {
     LOG_INF("Right button single click detected.");
 
-    //put to queue
-    button_msgq_item_t data = {
-        .type = BUTTON_EVENT_MAKE_MEASUREMENTS_AND_BLE,
-    };
-    while (k_msgq_put(&button_msgq, &data, K_NO_WAIT) != 0) {
-        /* message queue is full: purge old data & try again */
-        k_msgq_purge(&button_msgq);
-    }
-
-    k_thread_resume(main_tid); 
+    send_signal_to_main_thread(BUTTON_EVENT_MAKE_MEASUREMENTS_AND_BLE); 
 }
 
 void right_long_click(void) {
     LOG_INF("Right button long click detected.");
 
-
-    //put to queue
-    button_msgq_item_t data = {
-        .type = BUTTON_EVENT_MAKE_MEASUREMENTS,
-    };
-    while (k_msgq_put(&button_msgq, &data, K_NO_WAIT) != 0) {
-        /* message queue is full: purge old data & try again */
-        k_msgq_purge(&button_msgq);
-    }
-
-    k_thread_resume(main_tid); 
+    send_signal_to_main_thread(BUTTON_EVENT_ZIGBEE_FACTORY_RESET); 
 }
 
 void buttons_thread(void *, void *, void *) {
@@ -435,11 +422,22 @@ void periodic_thread(void *, void *, void *) {
                     LOG_INF("measuremnt data not advertised, ble state connected");
                 }
             }
+
+            if(device_config.zibee_enable) {
+                zigbee_app_update(results);
+            }
         }
 
         hardware_power_down();
 
-        k_msleep(get_next_wakeup_time_ms());
+
+        int sleep_time = 0;
+        if (device_config.periodic_thread_fast){
+            sleep_time = 2000;
+        } else {
+            sleep_time = get_next_wakeup_time_ms();
+        }
+        k_msleep(sleep_time);
     }
 }
 
@@ -549,34 +547,3 @@ measurments_t make_full_measurements(void) {
 
     return result;
 }
-
-
-
-#ifdef CONFIG_ZIGBEE
-
-#include <zboss_api.h>
-#include <zigbee/zigbee_error_handler.h>
-#include <zigbee/zigbee_app_utils.h>
-/**@brief Zigbee stack event handler.
- *
- * @param[in]   bufid   Reference to the Zigbee stack buffer
- *                      used to pass signal.
- */
-void zboss_signal_handler(zb_bufid_t bufid)
-{
-	/* Update network status LED. */
-
-	/* No application-specific behavior is required.
-	 * Call default signal handler.
-	 */
-	ZB_ERROR_CHECK(zigbee_default_signal_handler(bufid));
-
-	/* All callbacks should either reuse or free passed buffers.
-	 * If bufid == 0, the buffer is invalid (not passed).
-	 */
-	if (bufid) {
-		zb_buf_free(bufid);
-	}
-}
-
-#endif

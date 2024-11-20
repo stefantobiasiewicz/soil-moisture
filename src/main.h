@@ -34,6 +34,8 @@ typedef struct {
 	bool ble_enable;
 	bool display_enable;
     bool periodic_thread_suspend;
+    bool periodic_thread_fast;
+    bool zibee_enable;
 
 	hardware_init_status_t hardware_init_status;
 } deivce_config_t;

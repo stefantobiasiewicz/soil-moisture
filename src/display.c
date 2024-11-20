@@ -1,14 +1,36 @@
 #include "display.h"
 
-#include "EPD_2in13b_V4.h"
-#include "DEV_Config.h"
-
 #include <zephyr/kernel.h>
 #include "firmware/hardware.h"
 #include "validation.h"
 #include <zephyr/logging/log.h>
 
+LOG_MODULE_REGISTER(display, LOG_LEVEL_DBG);
+
+#ifndef CONFIG_LVGL
+void display_init() {
+  LOG_WRN("Display module is not builded into image set 'CONFIG_DISPLAY CONFIG_LVGL' to enable it.");
+}
+void display_exit_low_power() {
+  LOG_WRN("Display module is not builded into image set 'CONFIG_DISPLAY CONFIG_LVGL' to enable it.");
+}
+
+void display_values(measurments_t measuremet) {
+  LOG_WRN("Display module is not builded into image set 'CONFIG_DISPLAY CONFIG_LVGL' to enable it.");
+}
+void display_clean() {
+  LOG_WRN("Display module is not builded into image set 'CONFIG_DISPLAY and CONFIG_LVGL' to enable it.");
+}
+#endif /*CONFIG_LVGL*/
+
+
+#ifdef CONFIG_LVGL
+
+#include "EPD_2in13b_V4.h"
+#include "DEV_Config.h"
 #include "lvgl.h"
+
+#define CONFIG_EPD_2IN13B_V4
 
 #ifndef LV_ATTRIBUTE_MEM_ALIGN
 #define LV_ATTRIBUTE_MEM_ALIGN
@@ -624,3 +646,6 @@ void display_exit_low_power()
 {
   DEV_Module_Exit();
 }
+
+
+#endif /*CONFIG_LVGL*/

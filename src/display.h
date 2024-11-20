@@ -8,7 +8,7 @@
 #include <zephyr/logging/log.h>
 #include "main.h"
 
-#define CONFIG_EPD_2IN13B_V4
+
 
 void display_init();
 void display_exit_low_power();
