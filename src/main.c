@@ -18,6 +18,7 @@
 #include "conectivity/zigbee_app.h"
 
 #include "display.h"
+#include "../driver/EPD/DEV_Config.h"
 #include "logic_control.h"
 
 #include <stdlib.h>
@@ -35,7 +36,7 @@ deivce_config_t device_config = {
     .ble_enable = false,
     .display_enable = false,
     .periodic_thread_suspend = false,
-    .periodic_thread_fast = true,
+    .periodic_thread_fast = false,
     .zibee_enable = true,
 };
 
@@ -78,13 +79,23 @@ void app_ble_disconnected(void) {
     ble_connected = false;
 }
 
+void app_zigbee_rejoin_started_callback(void) {
+    hardware_set_led_color(255, 0, 0);
+}
+void app_zigbee_rejoin_stopped_callback(void) {
+    hardware_set_led_color(0,0,0);
+}
+
 application_api_t applciation_api =
 {
     .app_connected = app_ble_connected,
     .app_disconnected = app_ble_disconnected,
 };
 
-
+zigbee_app_rejoin_callbacks_t zigbee_app_rejoin_callbacks = {
+    .zigbee_app_rejoin_started_callback = app_zigbee_rejoin_started_callback, 
+    .zigbee_app_rejoin_stopped_callback = app_zigbee_rejoin_stopped_callback,
+};
 
 #define BUTTONS_STACK_SIZE 1024
 #define BUTTONS_THREAD_PRIORITY 2
@@ -154,16 +165,24 @@ int main(void)
         display_init();
         display_exit_low_power();
 
+
         hardware_power_down();
         hardware_power_internal_down();   
+    } else {
+        /**
+         * needed for low power to disable SPI when display is not available
+         */
+        DEV_Module_Init();
+        DEV_Module_Exit();
     }
+    
 
 
     hardware_power_down();
     hardware_power_internal_down();  
 
     if (device_config.zibee_enable) {
-        zigbee_app_init();
+        zigbee_app_init(zigbee_app_rejoin_callbacks);
         zigbee_app_start();
     }
 
@@ -212,7 +231,9 @@ int main(void)
                 hardware_power_down();
             }
             if (data.type == BUTTON_EVENT_ZIGBEE_FACTORY_RESET) {
-                zigbee_app_factory_reset();
+                if(device_config.zibee_enable) {
+                    zigbee_app_factory_reset();
+                }
             }
             if (data.type == BUTTON_EVENT_MAKE_MEASUREMENTS_AND_BLE) {
                 hardware_power_up();
@@ -231,7 +252,10 @@ int main(void)
                     }
                 }
 
-                zigbee_app_update(measuremet);
+                if(device_config.zibee_enable) {
+                    zigbee_app_update(measuremet);
+                }
+
                 hardware_power_down();
             }
             if (data.type == BUTTON_EVENT_MAKE_MEASUREMENTS_AND_UPDATE_DISPLAY) {        
@@ -245,6 +269,10 @@ int main(void)
                 }
 
                 hardware_power_down();
+
+                if(device_config.zibee_enable) {
+                    zigbee_app_update(measuremet);
+                }
             }
         }
 
@@ -395,7 +423,7 @@ void periodic_thread(void *, void *, void *) {
         hardware_power_up();
         measurments_t results = make_full_measurements();
 
-        bool notify = check_parameters_changes(results.soil_moisture, results.temperature_ground, results.battery, k_uptime_get());
+        bool notify = check_parameters_changes(results.soil_moisture_percent, results.temperature_ground, results.battery_percent, k_uptime_get());
 
         if(notify) {
             if(device_config.display_enable) {
@@ -472,8 +500,8 @@ measurments_t make_full_measurements(void) {
     k_msleep(500);
 
     result.battery_mv_raw = hardware_read_adc_mv_battery();
-    result.battery = vbat_calculate_battery(result.battery_mv_raw);
-    LOG_INF("Battery raw (mV): %d, Calculated battery: %.2f", result.battery_mv_raw, result.battery);
+    result.battery_percent = vbat_calculate_battery(result.battery_mv_raw);
+    LOG_INF("Battery raw (mV): %d, Calculated battery: %.2f", result.battery_mv_raw, result.battery_percent);
     k_msleep(20);
 
     int vcc_mv = hardware_read_adc_mv_vcc();
@@ -492,8 +520,8 @@ measurments_t make_full_measurements(void) {
     hardware_genrator_off();
     LOG_INF("Soil moisture raw (mV): %d", result.soil_moisture_mv_raw);
     
-    result.soil_moisture = capacitive_sensor_calculate_moisture(result.soil_moisture_mv_raw, soil_moisture_calib_data);
-    LOG_INF("Calculated soil moisture: %.2f", result.soil_moisture);
+    result.soil_moisture_percent = capacitive_sensor_calculate_moisture(result.soil_moisture_mv_raw, soil_moisture_calib_data);
+    LOG_INF("Calculated soil moisture: %.2f", result.soil_moisture_percent);
     k_msleep(20);
 
 

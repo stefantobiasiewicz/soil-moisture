@@ -182,7 +182,7 @@ float vbat_calculate_battery(uint16_t raw_value) {
 /**
  * @return if device should update display/send data
  */
-bool check_parameters_changes(float soil_moisture, float temperature_ground, float battery, uint64_t up_time_ms) {
+bool check_parameters_changes(float soil_moisture_percent, float temperature_ground, float battery, uint64_t up_time_ms) {
 
     return true;
 }

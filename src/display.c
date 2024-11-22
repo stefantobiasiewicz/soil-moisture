@@ -588,19 +588,19 @@ void main_screen(measurments_t measuremet)
    * setting all veriables
    */
 
-  if (measuremet.battery > 90)
+  if (measuremet.battery_percent > 90)
   {
     lv_label_set_text(battery_icon, LV_SYMBOL_BATTERY_FULL);
   }
-  else if (measuremet.battery > 70)
+  else if (measuremet.battery_percent > 70)
   {
     lv_label_set_text(battery_icon, LV_SYMBOL_BATTERY_3);
   }
-  else if (measuremet.battery > 45)
+  else if (measuremet.battery_percent > 45)
   {
     lv_label_set_text(battery_icon, LV_SYMBOL_BATTERY_2);
   }
-  else if (measuremet.battery > 20)
+  else if (measuremet.battery_percent > 20)
   {
     lv_label_set_text(battery_icon, LV_SYMBOL_BATTERY_1);
   }
@@ -609,8 +609,8 @@ void main_screen(measurments_t measuremet)
     lv_label_set_text(battery_icon, LV_SYMBOL_BATTERY_EMPTY);
   }
 
-  int moisture_int = get_integer_part(measuremet.soil_moisture);
-  int moisture_dec = get_decimal_part(measuremet.soil_moisture);
+  int moisture_int = get_integer_part(measuremet.soil_moisture_percent);
+  int moisture_dec = get_decimal_part(measuremet.soil_moisture_percent);
   lv_arc_set_value(arc, moisture_int);
   if (moisture_int < 20)
   {

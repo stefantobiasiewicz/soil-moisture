@@ -100,8 +100,8 @@ static void EPD_2IN13_V4_TurnOnDisplay(void)
 
 static void EPD_2IN13_V4_TurnOnDisplay_Fast(void)
 {
-	EPD_2IN13B_V4_SendCommand(0x22); // Display Update Control
-	EPD_2IN13B_V4_SendData(0xc7);	// fast:0x0c, quality:0x0f, 0xcf
+  	EPD_2IN13B_V4_SendCommand(0x22); //Display Update Control
+  	EPD_2IN13B_V4_SendData(0xb1);   // fast:0x0c, quality:0x0f, 0xcf
 	EPD_2IN13B_V4_SendCommand(0x20); // Activate Display Update Sequence
 	EPD_2IN13B_V4_ReadBusy();
 }
@@ -343,6 +343,7 @@ static int dummy_display_blanking_on(const struct device *dev)
 {
 	DEV_Module_Init();
 	EPD_2IN13B_V4_Init();
+	// EPD_HW_Init_Fast();
 	return 0;
 }
 

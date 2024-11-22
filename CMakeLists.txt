@@ -23,6 +23,8 @@ target_sources(app PRIVATE  src/conectivity/zigbee_app_utils_op.c)
 
 if(CONFIG_DISPLAY)
     add_subdirectory(driver/EPD)
+else()
+    target_sources(app PRIVATE  driver/EPD/DEV_Config.c)   
 endif()
 
 

@@ -172,13 +172,6 @@ static sensor_device_ctx_t m_dev_ctx;
           ZB_ZCL_MANUF_CODE_INVALID                                 \
         ),                                                          \
         ZB_ZCL_CLUSTER_DESC(                                        \
-          ZB_ZCL_CLUSTER_ID_IDENTIFY,                               \
-          0,                                                        \
-          NULL,                                                     \
-          ZB_ZCL_CLUSTER_CLIENT_ROLE,                               \
-          ZB_ZCL_MANUF_CODE_INVALID                                 \
-        ),                                                          \
-        ZB_ZCL_CLUSTER_DESC(                                        \
           ZB_ZCL_CLUSTER_ID_POWER_CONFIG,                           \
           ZB_ZCL_ARRAY_SIZE(power_config_attr_list, zb_zcl_attr_t), \
           (power_config_attr_list),                                 \
@@ -204,14 +197,13 @@ static sensor_device_ctx_t m_dev_ctx;
       ZB_ZCL_CLUSTER_ID_IDENTIFY,                                                     \
       ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT,                                             \
       ZB_ZCL_CLUSTER_ID_SOIL_MOISTURE_MEASUREMENT,                                    \
-      ZB_ZCL_CLUSTER_ID_IDENTIFY,                                                     \
       ZB_ZCL_CLUSTER_ID_POWER_CONFIG,                                                 \
     }                                                                                 \
   }
 
 #define ZB_PLANT_GUARD_GROUND_REPORT_ATTR_COUNT  (3 + ZB_ZCL_POWER_CONFIG_REPORT_ATTR_COUNT)    /**< Number of attributes mandatory for reporting in the Temperature and Pressure Measurement cluster. */
-#define ZB_PLANT_GUARD_GROUND_IN_CLUSTER_NUM     4                                 /**< Number of the input (server) clusters in the multisensor device. */
-#define ZB_PLANT_GUARD_GROUND_CLUSTER_NUM        1                                    /**< Number of the output (client) clusters in the multisensor device. */
+#define ZB_PLANT_GUARD_GROUND_IN_CLUSTER_NUM     5                                 /**< Number of the input (server) clusters in the multisensor device. */
+#define ZB_PLANT_GUARD_GROUND_OUT_CLUSTER_NUM    0                                    /**< Number of the output (client) clusters in the multisensor device. */
 
 
 /** @brief Declares endpoint for the plantguard GROUND endpoint.
@@ -225,7 +217,7 @@ static sensor_device_ctx_t m_dev_ctx;
   ZB_ZCL_DECLARE_PLANT_GUARD_GROUND_DESC(ep_name,                                       \
       ep_id,                                                                      \
       ZB_PLANT_GUARD_GROUND_IN_CLUSTER_NUM,                                             \
-      ZB_PLANT_GUARD_GROUND_CLUSTER_NUM);                                           \
+      ZB_PLANT_GUARD_GROUND_OUT_CLUSTER_NUM);                                           \
   ZBOSS_DEVICE_DECLARE_REPORTING_CTX(reporting_info## ep_name,            \
                                      ZB_PLANT_GUARD_GROUND_REPORT_ATTR_COUNT);          \
   ZB_AF_DECLARE_ENDPOINT_DESC(ep_name, ep_id,                                     \
@@ -503,26 +495,26 @@ void zigbee_app_update(measurments_t measurements)
     zb_zcl_status_t zcl_status;
 
     /* Get new temperature measured value */
-    zb_int16_t new_temp_value = (zb_int16_t)(measurements.temperature_ground * 100);
+    zb_int16_t zb_temp_value = (zb_int16_t)(measurements.temperature_ground * 100);
     //LOG_INF("bme_data.temperature: %d, %x" , new_temp_value, new_temp_value);
     zcl_status = zb_zcl_set_attr_val(PLANT_GUARD_GROUND_ENDPOINT, 
                                      ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, 
                                      ZB_ZCL_CLUSTER_SERVER_ROLE, 
                                      ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID, 
-                                     (zb_uint8_t *)&new_temp_value, 
+                                     (zb_uint8_t *)&zb_temp_value, 
                                      ZB_FALSE);
     if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
     {
         LOG_INF("Set temperature value fail. zcl_status: %d", zcl_status);
     }
 
-    zb_int16_t new_soil_moisture_value =  (zb_int16_t)(measurements.soil_moisture*100);
+    zb_int16_t zb_soil_moisture_value =  (zb_int16_t)(measurements.soil_moisture_percent*100);
     //sLOG_INF("bme_data.humidity/10: %d, %x" , new_hum_value, new_hum_value);
     zcl_status = zb_zcl_set_attr_val(PLANT_GUARD_GROUND_ENDPOINT,
                                      ZB_ZCL_CLUSTER_ID_SOIL_MOISTURE_MEASUREMENT, 
                                      ZB_ZCL_CLUSTER_SERVER_ROLE, 
                                      ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_ID, 
-                                     (zb_uint8_t *)&new_soil_moisture_value, 
+                                     (zb_uint8_t *)&zb_soil_moisture_value, 
                                      ZB_FALSE);
     if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
     {
@@ -531,56 +523,67 @@ void zigbee_app_update(measurments_t measurements)
 
    // LOG_INF("bme_data.pressure: %d, %x" , bme_data.pressure, bme_data.pressure);
     /* Get new pressure measured value */
-    zb_int16_t new_iluminance_value = (zb_int16_t)measurements.lux;
+    zb_int16_t zb_iluminance_value = (zb_int16_t)measurements.lux;
     //LOG_INF("bme_data.pressure/100: %d, %x" , new_pres_value, new_pres_value);
     zcl_status = zb_zcl_set_attr_val(PLANT_GUARD_AIR_ENDPOINT,
                                      ZB_ZCL_CLUSTER_ID_ILLUMINANCE_MEASUREMENT, 
                                      ZB_ZCL_CLUSTER_SERVER_ROLE, 
                                      ZB_ZCL_ATTR_PRESSURE_MEASUREMENT_VALUE_ID, 
-                                     (zb_uint8_t *)&new_iluminance_value, 
+                                     (zb_uint8_t *)&zb_iluminance_value, 
                                      ZB_FALSE);
     if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
     {
         LOG_INF("Set iluminance value fail. zcl_status: %d", zcl_status);
     }
 
-    zb_int16_t new_hum_value =  (zb_int16_t)(measurements.air_humidity*100);
+    zb_int16_t zb_hum_value =  (zb_int16_t)(measurements.air_humidity*100);
     //sLOG_INF("bme_data.humidity/10: %d, %x" , new_hum_value, new_hum_value);
     zcl_status = zb_zcl_set_attr_val(PLANT_GUARD_AIR_ENDPOINT,
                                      ZB_ZCL_CLUSTER_ID_REL_HUMIDITY_MEASUREMENT, 
                                      ZB_ZCL_CLUSTER_SERVER_ROLE, 
                                      ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_ID, 
-                                     (zb_uint8_t *)&new_hum_value, 
+                                     (zb_uint8_t *)&zb_hum_value, 
                                      ZB_FALSE);
     if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
     {
         LOG_INF("Set humidity value fail. zcl_status: %d", zcl_status);
     }
 
-    zb_int16_t new_air_temp =  (zb_int16_t)(measurements.air_temperature*100);
+    zb_int16_t zb_air_temp =  (zb_int16_t)(measurements.air_temperature*100);
     //sLOG_INF("bme_data.humidity/10: %d, %x" , new_hum_value, new_hum_value);
     zcl_status = zb_zcl_set_attr_val(PLANT_GUARD_AIR_ENDPOINT,
                                      ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, 
                                      ZB_ZCL_CLUSTER_SERVER_ROLE, 
                                      ZB_ZCL_ATTR_REL_HUMIDITY_MEASUREMENT_VALUE_ID, 
-                                     (zb_uint8_t *)&new_air_temp, 
+                                     (zb_uint8_t *)&zb_air_temp, 
                                      ZB_FALSE);
     if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
     {
         LOG_INF("Set air temperature value fail. zcl_status: %d", zcl_status);
     }
 
-    zb_uint8_t percent =  (zb_int_t)(255 * measurements.battery/100);
-    //sLOG_INF("bme_data.humidity/10: %d, %x" , new_hum_value, new_hum_value);
+    zb_uint8_t zb_battery_percent =  (zb_uint8_t)(measurements.battery_percent * 2);
     zcl_status = zb_zcl_set_attr_val(PLANT_GUARD_GROUND_ENDPOINT,
                                      ZB_ZCL_CLUSTER_ID_POWER_CONFIG, 
                                      ZB_ZCL_CLUSTER_SERVER_ROLE, 
                                      ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_PERCENTAGE_REMAINING_ID, 
-                                     &percent, 
+                                     &zb_battery_percent, 
                                      ZB_FALSE);
     if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
     {
         LOG_INF("Set battert percetage value fail. zcl_status: %d", zcl_status);
+    }
+
+    zb_uint8_t zb_battery_voltage =  (zb_int_t)(measurements.battery_mv_raw/100);
+    zcl_status = zb_zcl_set_attr_val(PLANT_GUARD_GROUND_ENDPOINT,
+                                     ZB_ZCL_CLUSTER_ID_POWER_CONFIG, 
+                                     ZB_ZCL_CLUSTER_SERVER_ROLE, 
+                                     ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID, 
+                                     &zb_battery_voltage, 
+                                     ZB_FALSE);
+    if(zcl_status != ZB_ZCL_STATUS_SUCCESS)
+    {
+        LOG_INF("Set battert voltage fail. zcl_status: %d", zcl_status);
     }
 }
 
@@ -654,7 +657,7 @@ static zb_uint8_t zcl_device_cb(zb_bufid_t bufid)
 
 
 
-void zigbee_app_init() {
+void zigbee_app_init(zigbee_app_rejoin_callbacks_t zigbee_app_rejoin_callbacks) {
   /* Register device context (endpoints). */
 	ZB_AF_REGISTER_DEVICE_CTX(&plant_guard_sensor_ctx);
 
@@ -668,6 +671,8 @@ void zigbee_app_init() {
 
   zigbee_configure_sleepy_behavior(true);
 
+  zigbee_set_join_network_callbacks(zigbee_app_rejoin_callbacks.zigbee_app_rejoin_started_callback, zigbee_app_rejoin_callbacks.zigbee_app_rejoin_stopped_callback);
+
   LOG_INF("initalizing zigbee.");
 }
 
@@ -676,19 +681,16 @@ void zigbee_app_start() {
   LOG_INF("starting zigbee thread");
 }
 
-#define ZB_DEV_REJOIN_TIMEOUT_MS (1000 * 20)
-static bool reset_done = false;
 
 void zigbee_app_factory_reset() {
-  LOG_DBG("Schedule Factory Reset; stop timer; set factory_reset_done flag");
-  if (reset_done == false) {
+  LOG_INF("Zigbee app reset network");
+
+  if (ZB_JOINED()){
+      LOG_INF("device is in network - factory reset stack");
       ZB_SCHEDULE_APP_CALLBACK(zb_bdb_reset_via_local_action, 0);
-      reset_done = true;
-  } else {
-    user_input_indicate();
-  }
-
-
+  } 
+  LOG_INF("trigger rejoining to network");
+  user_start_rejoin();
 }
 
 
@@ -730,7 +732,7 @@ void zboss_signal_handler(zb_bufid_t bufid)
         case ZB_BDB_SIGNAL_STEERING:
             LOG_INF("ZB_BDB_SIGNAL_STEERING.");
             if (status == RET_OK) {
-              reset_done = false;
+
             }
             break;
 

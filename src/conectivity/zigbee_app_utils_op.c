@@ -23,7 +23,7 @@
  * if can not join/rejoin a network.
  */
 #ifndef ZB_DEV_REJOIN_TIMEOUT_MS
-#define ZB_DEV_REJOIN_TIMEOUT_MS (1000 * 200)
+#define ZB_DEV_REJOIN_TIMEOUT_MS (1000 * 20)
 #endif
 
 /* Maximum interval between join/rejoin attempts. */
@@ -53,6 +53,9 @@ static uint8_t rejoin_attempt_cnt;
 static volatile bool wait_for_user_input;
 static volatile bool is_rejoin_start_scheduled;
 #endif
+
+zigbee_app_rejoin_started_callback_t zigbee_app_rejoin_started_callback = NULL;
+zigbee_app_rejoin_stopped_callback_t zigbee_app_rejoin_stopped_callback = NULL;
 
 /* Forward declarations. */
 static void rejoin_the_network(zb_uint8_t param);
@@ -370,14 +373,6 @@ zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
 			if (role != ZB_NWK_DEVICE_TYPE_COORDINATOR) {
 				LOG_INF("Network steering was not successful (status: %d)",
 					status);
-
-				/**
-				 *
-				 * OP modfications 
-				 * After failed atempt to join network start agin for X times
-				 * 
-				 */	
-				start_network_rejoin();
 			} else {
 				LOG_INF("Network steering failed on Zigbee coordinator (status: %d)",
 					status);
@@ -769,69 +764,11 @@ void zigbee_led_status_update(zb_bufid_t bufid, uint32_t led_idx)
  */
 static void start_network_steering(zb_uint8_t param)
 {
+	LOG_INF("start_network_steering");
+
 	ZVUNUSED(param);
 	ZVUNUSED(bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING));
 }
-
-
-
-
-#define REJOIN_ATTEMPTS_COUNT 3
-
-static zb_uint8_t called_count = 0;
-/**
- * OpenCoded
- * Process of trying to rejoining n-times 
- * 
- * Call only in ZB_SCHEDULE_APP_ALARM
- */
-static void try_rejoin_the_network(zb_uint8_t param) {
-	/* if network is already joined not proccess */
-	if(ZB_JOINED()) {
-		LOG_INF("device is already in network, stopping sheduling rejoin procedure");
-
-		zb_ret_t zb_err_code = ZB_SCHEDULE_APP_ALARM_CANCEL(
-			try_rejoin_the_network,
-			ZB_ALARM_ANY_PARAM);
-		if (zb_err_code == RET_OK) {
-			LOG_INF("Network rejoin procedure stopped.");
-		} else {
-			LOG_WRN("Network rejoin procedure stop failed.");
-		}
-
-		return;
-	}
-
-	if (called_count >= REJOIN_ATTEMPTS_COUNT) {
-		LOG_INF("rejoin procedure count reach limit");
-
-		zb_ret_t zb_err_code = ZB_SCHEDULE_APP_ALARM_CANCEL(
-			try_rejoin_the_network,
-			ZB_ALARM_ANY_PARAM);
-		if (zb_err_code == RET_OK) {
-			LOG_INF("Network rejoin procedure stopped.");
-		} else {
-			LOG_WRN("Network rejoin procedure stop failed.");
-		}
-
-		return;
-	}
-
-	called_count++;
-
-	LOG_INF("trying to rejoin network, atempt: %d", called_count);
-	ZB_SCHEDULE_APP_CALLBACK(start_network_steering, 0);
-}
-
-
-
-
-
-
-
-
-
-
 
 
 /**@brief Process rejoin procedure. To be called in signal handler.
@@ -845,12 +782,13 @@ static void rejoin_the_network(zb_uint8_t param)
 			is_rejoin_procedure_started = false;
 			is_rejoin_stop_requested = false;
 
-#if defined CONFIG_ZIGBEE_ROLE_END_DEVICE
 			LOG_INF("Network rejoin procedure stopped as %sscheduled.",
 				(wait_for_user_input) ? "" : "NOT ");
-#else
-			LOG_INF("Network rejoin procedure stopped.");
-#endif
+
+
+			if (zigbee_app_rejoin_stopped_callback != NULL) {
+				zigbee_app_rejoin_stopped_callback();
+			}
 		} else if (!is_rejoin_in_progress) {
 			/* Calculate new timeout */
 			zb_time_t timeout_s;
@@ -880,6 +818,10 @@ static void rejoin_the_network(zb_uint8_t param)
 
 			ZB_ERROR_CHECK(zb_err_code);
 			is_rejoin_in_progress = true;
+
+			if (zigbee_app_rejoin_started_callback != NULL) {
+				zigbee_app_rejoin_started_callback();
+			}
 		}
 	}
 }
@@ -910,7 +852,7 @@ void start_network_rejoin(void)
 			is_rejoin_in_progress = false;
 			rejoin_attempt_cnt = 0;
 
-#if defined CONFIG_ZIGBEE_ROLE_END_DEVICE
+
 			wait_for_user_input = false;
 			is_rejoin_start_scheduled = false;
 
@@ -920,7 +862,6 @@ void start_network_rejoin(void)
 				ZB_MILLISECONDS_TO_BEACON_INTERVAL(
 					ZB_DEV_REJOIN_TIMEOUT_MS));
 			ZB_ERROR_CHECK(zb_err_code);
-#endif
 
 			LOG_INF("Started network rejoin procedure.");
 		}
@@ -939,23 +880,11 @@ void stop_network_rejoin(zb_uint8_t was_scheduled)
 	 *   Try to stop scheduled network steering. Stop rejoin procedure
 	 *   or if no network steering was scheduled, request rejoin stop
 	 *   on next rejoin_the_network() call.
-	 * For End Device only:
-	 *   If stop_network_rejoin() was called from scheduler, the rejoin
-	 *   procedure has reached timeout, set wait_for_user_input
-	 *   to true so the rejoin procedure can only be started by calling
-	 *   user_input_indicate(). If not, set wait_for_user_input to false.
 	 */
 
 	zb_ret_t zb_err_code;
 
-#if defined CONFIG_ZIGBEE_ROLE_END_DEVICE
-	/* Set wait_for_user_input depending on if the device should retry
-	 * joining on user_input_indication().
-	 */
-	wait_for_user_input = was_scheduled;
-#else
 	ZVUNUSED(was_scheduled);
-#endif
 
 	if (is_rejoin_procedure_started) {
 		zb_err_code = ZB_SCHEDULE_APP_ALARM_CANCEL(
@@ -965,33 +894,25 @@ void stop_network_rejoin(zb_uint8_t was_scheduled)
 			/* Stop rejoin procedure */
 			is_rejoin_procedure_started = false;
 			is_rejoin_stop_requested = false;
-#if defined CONFIG_ZIGBEE_ROLE_END_DEVICE
-			LOG_INF("Network rejoin procedure stopped as %sscheduled.",
-				(wait_for_user_input) ? "" : "not ");
-#else
-			LOG_INF("Network rejoin procedure stopped.");
-#endif
+
+
 		} else {
 			/* Request rejoin procedure stop */
 			is_rejoin_stop_requested = true;
 		}
 	}
 
-	if (IS_ENABLED(CONFIG_ZIGBEE_ROLE_END_DEVICE)) {
-		/* Make sure scheduled stop alarm is canceled. */
-		zb_err_code = ZB_SCHEDULE_APP_ALARM_CANCEL(
-			stop_network_rejoin,
-			ZB_ALARM_ANY_PARAM);
-		if (zb_err_code != RET_NOT_FOUND) {
-			ZB_ERROR_CHECK(zb_err_code);
-		}
+	zb_err_code = ZB_SCHEDULE_APP_ALARM_CANCEL(
+		stop_network_rejoin,
+		ZB_ALARM_ANY_PARAM);
+	if (zb_err_code != RET_NOT_FOUND) {
+		ZB_ERROR_CHECK(zb_err_code);
 	}
+
+	wait_for_user_input = true;
 }
 
-#if defined CONFIG_ZIGBEE_ROLE_END_DEVICE
-/* Function to be scheduled when user_input_indicate() is called
- * and wait_for_user_input is true.
- */
+
 static void start_network_rejoin_ED(zb_uint8_t param)
 {
 	ZVUNUSED(param);
@@ -1013,7 +934,7 @@ static void start_network_rejoin_ED(zb_uint8_t param)
 /* Function to be called by an application
  * e.g. inside button handler function
  */
-void user_input_indicate(void)
+void user_start_rejoin(void)
 {
 	if (wait_for_user_input && !(is_rejoin_start_scheduled)) {
 		zb_ret_t zb_err_code = RET_OK;
@@ -1040,7 +961,11 @@ void zigbee_configure_sleepy_behavior(bool enable)
 		LOG_INF("Disabling sleepy end device behavior.");
 	}
 }
-#endif /* CONFIG_ZIGBEE_ROLE_END_DEVICE */
+
+void zigbee_set_join_network_callbacks(zigbee_app_rejoin_started_callback_t join_started, zigbee_app_rejoin_stopped_callback_t joins_stopped) {
+	zigbee_app_rejoin_started_callback = join_started;
+	zigbee_app_rejoin_stopped_callback = joins_stopped;
+}
 
 #if defined CONFIG_ZIGBEE_FACTORY_RESET
 

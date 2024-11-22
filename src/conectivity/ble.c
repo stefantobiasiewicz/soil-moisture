@@ -131,7 +131,7 @@ typedef struct {
     uint16_t temperature_ground_mv_raw;
     uint16_t temperature_ground;
     uint16_t soil_moisture_mv_raw;
-    uint16_t soil_moisture;
+    uint16_t soil_moisture_percent;
     uint16_t lux;
     uint16_t air_temperature;
     uint16_t air_humidity;
@@ -331,11 +331,11 @@ int ble_advertise_connection_stop() {
 
 int ble_advertise_not_connection_data_start(measurments_t data) {
     service_data.battery_mv_raw = data.battery_mv_raw;
-    service_data.battery = (uint16_t) (data.battery * 10);
+    service_data.battery = (uint16_t) (data.battery_percent * 10);
     service_data.temperature_ground_mv_raw = data.battery_mv_raw;
     service_data.temperature_ground = (uint16_t) (data.temperature_ground * 10);
     service_data.soil_moisture_mv_raw = data.soil_moisture_mv_raw;
-    service_data.soil_moisture = (uint16_t) (data.soil_moisture * 10);
+    service_data.soil_moisture_percent = (uint16_t) (data.soil_moisture_percent * 10);
     service_data.lux = (uint16_t) (data.lux);
     service_data.air_temperature = (uint16_t) (data.air_temperature * 10);
     service_data.air_humidity = (uint16_t) (data.air_humidity * 10);

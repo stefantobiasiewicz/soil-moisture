@@ -42,11 +42,11 @@ typedef struct {
 
 typedef struct {
     int battery_mv_raw;
-    float battery;
+    float battery_percent;
     int temperature_ground_mv_raw;
     float temperature_ground;
     int soil_moisture_mv_raw;
-    float soil_moisture;
+    float soil_moisture_percent;
     float lux;
     float air_temperature;
     float air_humidity;
@@ -59,7 +59,7 @@ typedef struct {
 typedef struct {
     uint16_t battery;
     uint16_t ground_temperature;
-    uint16_t soil_moisture;
+    uint16_t soil_moisture_percent;
     uint16_t lux;
     uint16_t air_temperature;
     uint16_t air_humidity;

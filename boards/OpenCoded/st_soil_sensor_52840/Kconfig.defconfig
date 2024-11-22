@@ -1,0 +1,6 @@
+if BOARD_ST_SOIL_SENSOR_52840
+
+config BT_CTLR
+	default BT
+
+endif # BOARD_ST_SOIL_SENSOR_52840

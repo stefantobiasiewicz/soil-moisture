@@ -224,8 +224,8 @@ void zigbee_led_status_update(zb_bufid_t bufid, uint32_t led_idx);
  * @note This function is to be used with End Devices only.
  *
  */
-#if defined CONFIG_ZIGBEE_ROLE_END_DEVICE
-void user_input_indicate(void);
+
+void user_start_rejoin(void);
 
 /**@brief Function for enabling sleepy behavior of End Device. Must be called
  *        before zigbee_enable() is called. Also must be called after ZB_INIT(),
@@ -237,7 +237,14 @@ void user_input_indicate(void);
  *                     should be enabled or disabled.
  */
 void zigbee_configure_sleepy_behavior(bool enable);
-#endif /* CONFIG_ZIGBEE_ROLE_END_DEVICE */
+
+
+
+typedef void (*zigbee_app_rejoin_started_callback_t)(void);
+typedef void (*zigbee_app_rejoin_stopped_callback_t)(void);
+
+void zigbee_set_join_network_callbacks(zigbee_app_rejoin_started_callback_t join_started, zigbee_app_rejoin_stopped_callback_t joins_stopped);
+
 
 #if defined CONFIG_ZIGBEE_FACTORY_RESET
 
