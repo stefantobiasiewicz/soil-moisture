@@ -23,7 +23,7 @@
  * if can not join/rejoin a network.
  */
 #ifndef ZB_DEV_REJOIN_TIMEOUT_MS
-#define ZB_DEV_REJOIN_TIMEOUT_MS (1000 * 20)
+#define ZB_DEV_REJOIN_TIMEOUT_MS (1000 * 40)
 #endif
 
 /* Maximum interval between join/rejoin attempts. */
@@ -50,7 +50,7 @@ static bool is_rejoin_stop_requested;
 static bool is_rejoin_in_progress;
 static uint8_t rejoin_attempt_cnt;
 #if defined CONFIG_ZIGBEE_ROLE_END_DEVICE
-static volatile bool wait_for_user_input;
+// static volatile bool wait_for_user_input;
 static volatile bool is_rejoin_start_scheduled;
 #endif
 
@@ -214,6 +214,34 @@ addr_type_t parse_address(const char *input, zb_addr_u *addr,
 	       ADDR_INVALID;
 }
 
+
+
+const char* get_nwk_command_status_name(zb_nwk_command_status_t status) {
+	switch (status) {
+		case 0x00U: return "ZB_NWK_COMMAND_STATUS_NO_ROUTE_AVAILABLE";
+		case 0x01U: return "ZB_NWK_COMMAND_STATUS_TREE_LINK_FAILURE";
+		case 0x02U: return "ZB_NWK_COMMAND_STATUS_NONE_TREE_LINK_FAILURE";
+		case 0x03U: return "ZB_NWK_COMMAND_STATUS_LOW_BATTERY_LEVEL";
+		case 0x04U: return "ZB_NWK_COMMAND_STATUS_NO_ROUTING_CAPACITY";
+		case 0x05U: return "ZB_NWK_COMMAND_STATUS_NO_INDIRECT_CAPACITY";
+		case 0x06U: return "ZB_NWK_COMMAND_STATUS_INDIRECT_TRANSACTION_EXPIRY";
+		case 0x07U: return "ZB_NWK_COMMAND_STATUS_TARGET_DEVICE_UNAVAILABLE";
+		case 0x08U: return "ZB_NWK_COMMAND_STATUS_TARGET_ADDRESS_UNALLOCATED";
+		case 0x09U: return "ZB_NWK_COMMAND_STATUS_PARENT_LINK_FAILURE";
+		case 0x0aU: return "ZB_NWK_COMMAND_STATUS_VALIDATE_ROUTE";
+		case 0x0bU: return "ZB_NWK_COMMAND_STATUS_SOURCE_ROUTE_FAILURE";
+		case 0x0cU: return "ZB_NWK_COMMAND_STATUS_MANY_TO_ONE_ROUTE_FAILURE";
+		case 0x0dU: return "ZB_NWK_COMMAND_STATUS_ADDRESS_CONFLICT";
+		case 0x0eU: return "ZB_NWK_COMMAND_STATUS_VERIFY_ADDRESS";
+		case 0x0fU: return "ZB_NWK_COMMAND_STATUS_PAN_IDENTIFIER_UPDATE";
+		case 0x10U: return "ZB_NWK_COMMAND_STATUS_NETWORK_ADDRESS_UPDATE";
+		case 0x11U: return "ZB_NWK_COMMAND_STATUS_BAD_FRAME_COUNTER";
+		case 0x12U: return "ZB_NWK_COMMAND_STATUS_BAD_KEY_SEQUENCE_NUMBER";
+		case 0x13U: return "ZB_NWK_COMMAND_STATUS_UNKNOWN_COMMAND";
+		default:    return "UNKNOWN_STATUS_CODE";
+	}
+}
+
 zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
 {
 	zb_zdo_app_signal_hdr_t *sig_hndler = NULL;
@@ -292,7 +320,7 @@ zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
 		}
 		break;
 
-	case ZB_BDB_SIGNAL_DEVICE_REBOOT:
+	case ZB_BDB_SIGNAL_DEVICE_REBOOT: // <--- to jest gdy urzadzenie jest połaczone do sieci i startuje albo straciło sygnał ???? to trzeba sprawdzić 
 		/* At this point Zigbee stack is ready to operate and the BDB
 		 * initialization procedure has finished. There is network
 		 * configuration stored inside NVRAM, so the device
@@ -377,6 +405,11 @@ zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
 				LOG_INF("Network steering failed on Zigbee coordinator (status: %d)",
 					status);
 			}
+		}
+
+
+		if (zigbee_app_rejoin_stopped_callback != NULL) {
+			zigbee_app_rejoin_stopped_callback();
 		}
 		break;
 
@@ -697,6 +730,10 @@ zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
 				if (role != ZB_NWK_DEVICE_TYPE_COORDINATOR) {
 					stop_network_rejoin(ZB_FALSE);
 				}
+
+				if (zigbee_app_rejoin_stopped_callback != NULL) {
+					zigbee_app_rejoin_stopped_callback();
+				}
 			} else {
 				if (role != ZB_NWK_DEVICE_TYPE_COORDINATOR) {
 					LOG_INF("TC Rejoin was not successful (status: %d)",
@@ -714,6 +751,19 @@ zb_ret_t zigbee_default_signal_handler(zb_bufid_t bufid)
 		 * Fall-through to the default case if Trust Center Rejoin is disabled
 		 */
 
+	case ZB_NLME_STATUS_INDICATION:
+		/**
+		 * added for monitor if device is moved to other place and not connected to parent
+		 * https://devzone.nordicsemi.com/f/nordic-q-a/95966/zigbee-end-device-wrong-connection-to-coordinator
+		 * 
+		 * https://devzone.nordicsemi.com/f/nordic-q-a/85047/zigbee---removing-old-bindings-to-rejoin-to-new-coordinator/354491
+		 */
+
+		zb_nwk_command_status_t cmd_status = (zb_nwk_command_status_t) status;
+
+		LOG_INF("ZB_NLME_STATUS: %s" ,get_nwk_command_status_name(cmd_status));
+	
+		break;
 	default:
 		/* Unimplemented signal. For more information,
 		 * see: zb_zdo_app_signal_type_e and zb_ret_e.
@@ -765,6 +815,9 @@ void zigbee_led_status_update(zb_bufid_t bufid, uint32_t led_idx)
 static void start_network_steering(zb_uint8_t param)
 {
 	LOG_INF("start_network_steering");
+	if (zigbee_app_rejoin_started_callback != NULL) {
+		zigbee_app_rejoin_started_callback();
+	}
 
 	ZVUNUSED(param);
 	ZVUNUSED(bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING));
@@ -782,10 +835,7 @@ static void rejoin_the_network(zb_uint8_t param)
 			is_rejoin_procedure_started = false;
 			is_rejoin_stop_requested = false;
 
-			LOG_INF("Network rejoin procedure stopped as %sscheduled.",
-				(wait_for_user_input) ? "" : "NOT ");
-
-
+			LOG_INF("Network rejoin procedure stopped as scheduled.");
 			if (zigbee_app_rejoin_stopped_callback != NULL) {
 				zigbee_app_rejoin_stopped_callback();
 			}
@@ -796,20 +846,33 @@ static void rejoin_the_network(zb_uint8_t param)
 			zb_callback_t alarm_cb = start_network_steering;
 			zb_uint8_t alarm_cb_param = ZB_FALSE;
 
-			if ((1 << rejoin_attempt_cnt) > REJOIN_INTERVAL_MAX_S) {
-				timeout_s = REJOIN_INTERVAL_MAX_S;
-			} else {
-				timeout_s = (1 << rejoin_attempt_cnt);
-				rejoin_attempt_cnt++;
-			}
+
+			// if ((1 << rejoin_attempt_cnt) > REJOIN_INTERVAL_MAX_S) {
+			// 	timeout_s = REJOIN_INTERVAL_MAX_S;
+			// } else {
+			// 	timeout_s = (1 << rejoin_attempt_cnt);
+			// 	rejoin_attempt_cnt++;
+			// }
+
+			rejoin_attempt_cnt++;
 
 			if (IS_ENABLED(CONFIG_ZIGBEE_TC_REJOIN_ENABLED)) {
-				if ((timeout_s > TC_REJOIN_INTERVAL_THRESHOLD_S)
-					&& !zb_bdb_is_factory_new()) {
+				if (rejoin_attempt_cnt >= 5 && !zb_bdb_is_factory_new()) {
+					LOG_INF("zb_bdb_initiate_tc_rejoin");
+
 					alarm_cb = zb_bdb_initiate_tc_rejoin;
 					alarm_cb_param = ZB_UNDEFINED_BUFFER;
 				}
 			}
+
+			if(rejoin_attempt_cnt >= 10) {
+				stop_network_rejoin(ZB_FALSE);
+				if (zigbee_app_rejoin_stopped_callback != NULL) {
+					zigbee_app_rejoin_stopped_callback();
+				}
+				return;
+			}
+
 
 			zb_err_code = ZB_SCHEDULE_APP_ALARM(
 				alarm_cb,
@@ -818,10 +881,6 @@ static void rejoin_the_network(zb_uint8_t param)
 
 			ZB_ERROR_CHECK(zb_err_code);
 			is_rejoin_in_progress = true;
-
-			if (zigbee_app_rejoin_started_callback != NULL) {
-				zigbee_app_rejoin_started_callback();
-			}
 		}
 	}
 }
@@ -840,7 +899,7 @@ static void rejoin_the_network(zb_uint8_t param)
 void start_network_rejoin(void)
 {
 #if defined CONFIG_ZIGBEE_ROLE_END_DEVICE
-	if (!ZB_JOINED() && stack_initialised && !wait_for_user_input) {
+	if (!ZB_JOINED() && stack_initialised) {
 #else
 	if (!ZB_JOINED() && stack_initialised) {
 #endif
@@ -853,7 +912,6 @@ void start_network_rejoin(void)
 			rejoin_attempt_cnt = 0;
 
 
-			wait_for_user_input = false;
 			is_rejoin_start_scheduled = false;
 
 			zb_ret_t zb_err_code = ZB_SCHEDULE_APP_ALARM(
@@ -908,18 +966,15 @@ void stop_network_rejoin(zb_uint8_t was_scheduled)
 	if (zb_err_code != RET_NOT_FOUND) {
 		ZB_ERROR_CHECK(zb_err_code);
 	}
-
-	wait_for_user_input = true;
 }
 
 
 static void start_network_rejoin_ED(zb_uint8_t param)
 {
 	ZVUNUSED(param);
-	if (!ZB_JOINED() && wait_for_user_input) {
+	if (!ZB_JOINED()) {
 		zb_ret_t zb_err_code;
 
-		wait_for_user_input = false;
 		start_network_rejoin();
 
 		zb_err_code = ZB_SCHEDULE_APP_ALARM(
@@ -936,7 +991,7 @@ static void start_network_rejoin_ED(zb_uint8_t param)
  */
 void user_start_rejoin(void)
 {
-	if (wait_for_user_input && !(is_rejoin_start_scheduled)) {
+	if (!ZB_JOINED() && !(is_rejoin_start_scheduled)) {
 		zb_ret_t zb_err_code = RET_OK;
 
 		zb_err_code =
