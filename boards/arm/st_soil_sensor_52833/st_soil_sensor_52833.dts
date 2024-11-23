@@ -78,8 +78,8 @@
 
 	/* These aliases are provided for compatibility with samples */
 	aliases {
-		pwm-led-r = &led_pwm_0;
-		pwm-led-g = &led_pwm_2;
+		pwm-led-r = &led_pwm_2;
+		pwm-led-g = &led_pwm_0;
 		pwm-led-b = &led_pwm_1;
 		button-left = &button0;
 		button-right = &button1;
